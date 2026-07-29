@@ -507,11 +507,36 @@ export const OrchestrationSubscribeThreadInput = Schema.Struct({
 });
 export type OrchestrationSubscribeThreadInput = typeof OrchestrationSubscribeThreadInput.Type;
 
+// Pagination metadata for a windowed thread snapshot. Absent on the legacy
+// full-thread snapshot (the whole history is present), so clients treat
+// `undefined` as "complete history, nothing older to load".
+export const OrchestrationThreadMessageWindow = Schema.Struct({
+  // Whether messages older than the returned window exist and can be paged in.
+  hasMoreBefore: Schema.Boolean,
+  // Cursor for the next `messagesBefore` page: the id of the oldest message in
+  // this window. Null when the thread has no messages.
+  oldestMessageId: Schema.NullOr(MessageId),
+});
+export type OrchestrationThreadMessageWindow = typeof OrchestrationThreadMessageWindow.Type;
+
 export const OrchestrationThreadDetailSnapshot = Schema.Struct({
   snapshotSequence: NonNegativeInt,
   thread: OrchestrationThread,
+  // Present only when the thread was loaded with a bounded message window
+  // (mobile). The full-snapshot endpoint omits it.
+  messageWindow: Schema.optional(OrchestrationThreadMessageWindow),
 });
 export type OrchestrationThreadDetailSnapshot = typeof OrchestrationThreadDetailSnapshot.Type;
+
+// A page of older messages (+ their activities) for lazy "load older" scrolling.
+export const OrchestrationThreadMessagePage = Schema.Struct({
+  snapshotSequence: NonNegativeInt,
+  messages: Schema.Array(OrchestrationMessage),
+  activities: Schema.Array(OrchestrationThreadActivity),
+  hasMoreBefore: Schema.Boolean,
+  oldestMessageId: Schema.NullOr(MessageId),
+});
+export type OrchestrationThreadMessagePage = typeof OrchestrationThreadMessagePage.Type;
 
 export const ProjectCreateCommand = Schema.Struct({
   type: Schema.Literal("project.create"),

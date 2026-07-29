@@ -18,6 +18,13 @@ import {
 import { OrchestrationEngineService } from "./Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "./Services/ProjectionSnapshotQuery.ts";
 
+// Number of most-recent messages returned by the windowed initial load, and the
+// page size for lazily loading older messages. Chosen to keep the initial
+// payload small (fast parse/render on mobile) while covering the typical
+// on-screen history; older messages page in on scroll.
+const THREAD_MESSAGE_WINDOW_SIZE = 60;
+const THREAD_MESSAGE_PAGE_SIZE = 60;
+
 export const orchestrationHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,
   "orchestration",
@@ -70,6 +77,46 @@ export const orchestrationHttpApiLayer = HttpApiBuilder.group(
             return yield* failEnvironmentNotFound("thread_not_found");
           }
           return snapshot.value;
+        }),
+      )
+      .handle(
+        "threadWindowSnapshot",
+        Effect.fn("environment.orchestration.threadWindowSnapshot")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          const snapshot = yield* projectionSnapshotQuery
+            .getThreadWindowSnapshot(args.params.threadId, THREAD_MESSAGE_WINDOW_SIZE)
+            .pipe(
+              Effect.catch((cause) =>
+                failEnvironmentInternal("orchestration_thread_snapshot_failed", cause),
+              ),
+            );
+          if (Option.isNone(snapshot)) {
+            return yield* failEnvironmentNotFound("thread_not_found");
+          }
+          return snapshot.value;
+        }),
+      )
+      .handle(
+        "threadMessagesBefore",
+        Effect.fn("environment.orchestration.threadMessagesBefore")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          const page = yield* projectionSnapshotQuery
+            .getThreadMessagePageBefore({
+              threadId: args.params.threadId,
+              beforeMessageId: args.params.beforeMessageId,
+              limit: THREAD_MESSAGE_PAGE_SIZE,
+            })
+            .pipe(
+              Effect.catch((cause) =>
+                failEnvironmentInternal("orchestration_thread_snapshot_failed", cause),
+              ),
+            );
+          if (Option.isNone(page)) {
+            return yield* failEnvironmentNotFound("thread_not_found");
+          }
+          return page.value;
         }),
       )
       .handle(

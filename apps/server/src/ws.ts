@@ -52,6 +52,7 @@ import {
   AssetWorkspaceContextNotFoundError,
   AssetWorkspaceContextResolutionError,
   EnvironmentAuthorizationError,
+  PushRegistrationError,
   ThreadId,
   type TerminalAttachStreamEvent,
   type TerminalError,
@@ -65,6 +66,7 @@ import { HttpRouter, HttpServerRequest, HttpServerRespondable } from "effect/uns
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
+import * as PushDevices from "./persistence/PushDevices.ts";
 import * as ServerConfig from "./config.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -309,6 +311,8 @@ const RPC_REQUIRED_SCOPE = new Map<string, AuthEnvironmentScope>([
   [WS_METHODS.serverSignalProcess, AuthOrchestrationOperateScope],
   [WS_METHODS.cloudGetRelayClientStatus, AuthRelayWriteScope],
   [WS_METHODS.cloudInstallRelayClient, AuthRelayWriteScope],
+  [WS_METHODS.pushRegisterToken, AuthOrchestrationReadScope],
+  [WS_METHODS.pushUnregisterToken, AuthOrchestrationReadScope],
   [WS_METHODS.sourceControlLookupRepository, AuthOrchestrationReadScope],
   [WS_METHODS.sourceControlCloneRepository, AuthOrchestrationOperateScope],
   [WS_METHODS.sourceControlPublishRepository, AuthOrchestrationOperateScope],
@@ -448,6 +452,7 @@ const makeWsRpcLayer = (
       const processDiagnostics = yield* ProcessDiagnostics.ProcessDiagnostics;
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
       const relayClient = yield* RelayClient.RelayClient;
+      const pushDevices = yield* PushDevices.PushDeviceRepository;
       const authorizationError = (requiredScope: AuthEnvironmentScope) =>
         new EnvironmentAuthorizationError({
           message: `The authenticated token is missing required scope: ${requiredScope}.`,
@@ -1556,6 +1561,48 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.serverSignalProcess, processDiagnostics.signal(input), {
             "rpc.aggregate": "server",
           }),
+        [WS_METHODS.pushRegisterToken]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.pushRegisterToken,
+            Effect.gen(function* () {
+              const now = yield* DateTime.now;
+              yield* pushDevices.upsert({
+                deviceId: input.deviceId,
+                sessionId: currentSessionId,
+                platform: input.platform,
+                token: input.token,
+                label: input.label ?? null,
+                appVersion: input.appVersion ?? null,
+                preferences: input.preferences,
+                now,
+              });
+              return { registered: true };
+            }).pipe(
+              Effect.mapError(
+                (cause) =>
+                  new PushRegistrationError({
+                    message:
+                      cause instanceof Error ? cause.message : "Failed to register push token.",
+                  }),
+              ),
+            ),
+            { "rpc.aggregate": "push" },
+          ),
+        [WS_METHODS.pushUnregisterToken]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.pushUnregisterToken,
+            pushDevices.deleteByDeviceId({ deviceId: input.deviceId }).pipe(
+              Effect.map((unregistered) => ({ unregistered })),
+              Effect.mapError(
+                (cause) =>
+                  new PushRegistrationError({
+                    message:
+                      cause instanceof Error ? cause.message : "Failed to unregister push token.",
+                  }),
+              ),
+            ),
+            { "rpc.aggregate": "push" },
+          ),
         [WS_METHODS.cloudGetRelayClientStatus]: (_input) =>
           observeRpcEffect(WS_METHODS.cloudGetRelayClientStatus, relayClient.resolve, {
             "rpc.aggregate": "cloud",

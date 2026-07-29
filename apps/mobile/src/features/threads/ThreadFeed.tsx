@@ -126,6 +126,11 @@ export interface ThreadFeedProps {
   readonly threadId: ThreadId;
   readonly workspaceRoot?: string | null;
   readonly feed: ReadonlyArray<ThreadFeedEntry>;
+  // Windowed thread loading: pull older messages when the user scrolls near the
+  // top. Optional so other ThreadFeed callers need not supply them.
+  readonly onLoadOlder?: () => void;
+  readonly hasMoreOlder?: boolean;
+  readonly loadingOlder?: boolean;
   readonly contentPresentation: ThreadContentPresentation;
   readonly agentLabel: string;
   readonly latestTurn: ThreadFeedLatestTurn | null;
@@ -1416,9 +1421,22 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       // rests at contentOffset.y = -headerHeight (the inset lives only in
       // UIKit's adjustedContentInset, so topContentInset is 0 here). Add the
       // header height back or the material toggles a full header too late.
-      reportHeaderMaterialVisibility(event.nativeEvent.contentOffset.y + anchorTopInset > 6);
+      const offsetFromTop = event.nativeEvent.contentOffset.y + anchorTopInset;
+      reportHeaderMaterialVisibility(offsetFromTop > 6);
+      // Windowed thread loading: page in older messages as the user nears the
+      // top. The hook dedupes concurrent loads and stops when history is
+      // exhausted, so it is safe to call on every near-top scroll event.
+      if (props.hasMoreOlder && !props.loadingOlder && offsetFromTop < 320) {
+        props.onLoadOlder?.();
+      }
     },
-    [reportHeaderMaterialVisibility, anchorTopInset],
+    [
+      reportHeaderMaterialVisibility,
+      anchorTopInset,
+      props.hasMoreOlder,
+      props.loadingOlder,
+      props.onLoadOlder,
+    ],
   );
   const handleViewportLayout = useCallback((event: LayoutChangeEvent) => {
     const nextWidth = Math.round(event.nativeEvent.layout.width);
@@ -1792,7 +1810,14 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             onScroll={handleScroll}
             scrollEventThrottle={16}
             ListHeaderComponent={
-              usesNativeAutomaticInsets ? null : <View style={{ height: topContentInset }} />
+              <View>
+                {props.loadingOlder ? (
+                  <View style={{ paddingVertical: 16, alignItems: "center" }}>
+                    <ActivityIndicator />
+                  </View>
+                ) : null}
+                {usesNativeAutomaticInsets ? null : <View style={{ height: topContentInset }} />}
+              </View>
             }
             contentContainerStyle={{
               paddingTop: 12,

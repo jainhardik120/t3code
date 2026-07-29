@@ -33,6 +33,9 @@ config.resolver = {
         ? [config.resolver.blockList]
         : []),
     new RegExp(`${escapedWorkspaceRoot}[/\\\\]\\.t3[/\\\\].*`),
+    // The repro harness server writes a churning, sometimes root-owned data dir
+    // here (see infra/repro); never let Metro crawl/watch it.
+    new RegExp(`${escapedWorkspaceRoot}[/\\\\]infra[/\\\\]repro[/\\\\]\\.data[/\\\\].*`),
   ],
   extraNodeModules: {
     // oxlint-disable-next-line unicorn/no-useless-fallback-in-spread

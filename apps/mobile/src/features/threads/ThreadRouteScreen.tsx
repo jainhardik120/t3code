@@ -755,6 +755,9 @@ function ThreadRouteContent(
           connectionError={routeConnectionError}
           environmentLabel={selectedEnvironmentConnection?.environmentLabel ?? null}
           selectedThreadFeed={composer.selectedThreadFeed}
+          onLoadOlderMessages={composer.onLoadOlderMessages}
+          hasMoreOlderMessages={composer.hasMoreOlderMessages}
+          loadingOlderMessages={composer.loadingOlderMessages}
           activeWorkStartedAt={composer.activeWorkStartedAt}
           activePendingApproval={requests.activePendingApproval}
           respondingApprovalId={requests.respondingApprovalId}

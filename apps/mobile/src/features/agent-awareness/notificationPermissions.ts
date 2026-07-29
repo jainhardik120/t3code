@@ -34,7 +34,11 @@ export const requestAgentNotificationPermission: Effect.Effect<
   NotificationPermissionResult,
   NotificationPermissionReadError | NotificationPermissionRequestError
 > = Effect.gen(function* () {
-  if (Platform.OS !== "ios") {
+  // iOS (APNs, via the hosted relay) and Android (FCM, via the self-hosted
+  // server) both support notifications. Android 13+ surfaces a runtime
+  // POST_NOTIFICATIONS prompt through requestPermissionsAsync; earlier versions
+  // grant it implicitly.
+  if (Platform.OS !== "ios" && Platform.OS !== "android") {
     return { type: "unsupported" };
   }
 

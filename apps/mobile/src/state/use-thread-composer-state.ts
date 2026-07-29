@@ -22,6 +22,19 @@ import {
 import type { DraftComposerImageAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { buildThreadFeed } from "../lib/threadActivity";
+import { useThreadOlderMessages } from "./use-thread-older-messages";
+
+function dedupeById<T extends { readonly id: string }>(items: ReadonlyArray<T>): ReadonlyArray<T> {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      out.push(item);
+    }
+  }
+  return out;
+}
 import { appAtomRegistry } from "../state/atom-registry";
 import {
   appendComposerDraftAttachments,
@@ -89,10 +102,28 @@ export function useThreadComposerState() {
     () => (selectedThreadKey ? (queuedMessagesByThreadKey[selectedThreadKey] ?? []) : []),
     [queuedMessagesByThreadKey, selectedThreadKey],
   );
-  const selectedThreadFeed = useMemo(
-    () => (selectedThreadDetail ? buildThreadFeed(selectedThreadDetail) : []),
-    [selectedThreadDetail],
+  // Older messages paged in on scroll-up (windowed thread loading). Merged into
+  // the feed ahead of the latest window the streaming machine holds.
+  const olderMessages = useThreadOlderMessages(
+    selectedThreadShell?.environmentId ?? null,
+    selectedThreadDetail,
   );
+  const selectedThreadFeed = useMemo(() => {
+    if (!selectedThreadDetail) {
+      return [];
+    }
+    if (olderMessages.olderMessages.length === 0 && olderMessages.olderActivities.length === 0) {
+      return buildThreadFeed(selectedThreadDetail);
+    }
+    return buildThreadFeed({
+      ...selectedThreadDetail,
+      messages: dedupeById([...olderMessages.olderMessages, ...selectedThreadDetail.messages]),
+      activities: dedupeById([
+        ...olderMessages.olderActivities,
+        ...selectedThreadDetail.activities,
+      ]),
+    });
+  }, [selectedThreadDetail, olderMessages.olderMessages, olderMessages.olderActivities]);
 
   const selectedDraft = selectedThreadKey ? composerDrafts[selectedThreadKey] : null;
   const draftMessage = selectedDraft?.text ?? "";
@@ -291,6 +322,9 @@ export function useThreadComposerState() {
 
   return {
     selectedThreadFeed,
+    onLoadOlderMessages: olderMessages.loadOlder,
+    hasMoreOlderMessages: olderMessages.hasMore,
+    loadingOlderMessages: olderMessages.loading,
     selectedThreadQueueCount,
     activeWorkStartedAt,
     draftMessage,

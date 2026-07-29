@@ -32,6 +32,7 @@ import {
   OrchestrationReadModel,
   OrchestrationShellSnapshot,
   OrchestrationThreadDetailSnapshot,
+  OrchestrationThreadMessagePage,
 } from "./orchestration.ts";
 import {
   RelayCloudEnvironmentHealthRequest,
@@ -457,6 +458,12 @@ const EnvironmentOrchestrationThreadSnapshotParams = Schema.Struct({
   threadId: ThreadId,
 });
 
+const EnvironmentOrchestrationThreadMessagesBeforeParams = Schema.Struct({
+  threadId: ThreadId,
+  // Cursor: return messages older than this message id (exclusive).
+  beforeMessageId: TrimmedNonEmptyString,
+});
+
 export class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestration")
   .add(
     HttpApiEndpoint.get("snapshot", "/api/orchestration/snapshot", {
@@ -479,6 +486,29 @@ export class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestr
       success: OrchestrationThreadDetailSnapshot,
       error: EnvironmentOrchestrationThreadSnapshotErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    // Windowed initial load: returns only the latest N messages/activities plus
+    // pagination metadata, so large threads don't ship the entire history in one
+    // payload. Clients page older messages via `threadMessagesBefore`.
+    HttpApiEndpoint.get("threadWindowSnapshot", "/api/orchestration/threads/:threadId/window", {
+      headers: OptionalBearerHeaders,
+      params: EnvironmentOrchestrationThreadSnapshotParams,
+      success: OrchestrationThreadDetailSnapshot,
+      error: EnvironmentOrchestrationThreadSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "threadMessagesBefore",
+      "/api/orchestration/threads/:threadId/messages-before/:beforeMessageId",
+      {
+        headers: OptionalBearerHeaders,
+        params: EnvironmentOrchestrationThreadMessagesBeforeParams,
+        success: OrchestrationThreadMessagePage,
+        error: EnvironmentOrchestrationThreadSnapshotErrors,
+      },
+    ).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
     HttpApiEndpoint.post("dispatch", "/api/orchestration/dispatch", {

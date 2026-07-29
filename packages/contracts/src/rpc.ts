@@ -46,6 +46,13 @@ import {
 } from "./review.ts";
 import { KeybindingsConfigError } from "./keybindings.ts";
 import {
+  PushRegisterTokenInput,
+  PushRegisterTokenResult,
+  PushRegistrationError,
+  PushUnregisterTokenInput,
+  PushUnregisterTokenResult,
+} from "./push.ts";
+import {
   ClientOrchestrationCommand,
   ORCHESTRATION_WS_METHODS,
   OrchestrationDispatchCommandError,
@@ -222,6 +229,10 @@ export const WS_METHODS = {
   // Cloud environment methods
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
   cloudInstallRelayClient: "cloud.installRelayClient",
+
+  // Self-hosted push notification methods
+  pushRegisterToken: "push.registerToken",
+  pushUnregisterToken: "push.unregisterToken",
 
   // Source control methods
   sourceControlLookupRepository: "sourceControl.lookupRepository",
@@ -698,6 +709,18 @@ export const WsSubscribeAuthAccessRpc = Rpc.make(WS_METHODS.subscribeAuthAccess,
   stream: true,
 });
 
+export const WsPushRegisterTokenRpc = Rpc.make(WS_METHODS.pushRegisterToken, {
+  payload: PushRegisterTokenInput,
+  success: PushRegisterTokenResult,
+  error: Schema.Union([PushRegistrationError, EnvironmentAuthorizationError]),
+});
+
+export const WsPushUnregisterTokenRpc = Rpc.make(WS_METHODS.pushUnregisterToken, {
+  payload: PushUnregisterTokenInput,
+  success: PushUnregisterTokenResult,
+  error: Schema.Union([PushRegistrationError, EnvironmentAuthorizationError]),
+});
+
 export const WsRpcGroup = RpcGroup.make(
   WsServerProbeRpc,
   WsServerGetConfigRpc,
@@ -715,6 +738,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerSignalProcessRpc,
   WsCloudGetRelayClientStatusRpc,
   WsCloudInstallRelayClientRpc,
+  WsPushRegisterTokenRpc,
+  WsPushUnregisterTokenRpc,
   WsSourceControlLookupRepositoryRpc,
   WsSourceControlCloneRepositoryRpc,
   WsSourceControlPublishRepositoryRpc,

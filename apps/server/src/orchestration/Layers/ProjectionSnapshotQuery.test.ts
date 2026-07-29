@@ -1549,6 +1549,156 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
       assert.equal(shellSnapshot.threads.length, 0);
     }),
   );
+
+  it.effect("windows thread detail to the latest N messages and pages older via SQL", () =>
+    Effect.gen(function* () {
+      const snapshotQuery = yield* ProjectionSnapshotQuery;
+      const sql = yield* SqlClient.SqlClient;
+
+      yield* sql`DELETE FROM projection_projects`;
+      yield* sql`DELETE FROM projection_threads`;
+      yield* sql`DELETE FROM projection_thread_messages`;
+      yield* sql`DELETE FROM projection_thread_activities`;
+      yield* sql`DELETE FROM projection_state`;
+
+      yield* sql`
+        INSERT INTO projection_projects (
+          project_id, title, workspace_root, default_model_selection_json, scripts_json,
+          created_at, updated_at, deleted_at
+        )
+        VALUES (
+          'project-window', 'Window Project', '/tmp/window',
+          '{"provider":"codex","model":"gpt-5-codex"}', '[]',
+          '2026-05-01T00:00:00.000Z', '2026-05-01T00:00:01.000Z', NULL
+        )
+      `;
+
+      yield* sql`
+        INSERT INTO projection_threads (
+          thread_id, project_id, title, model_selection_json, runtime_mode, interaction_mode,
+          branch, worktree_path, latest_turn_id, latest_user_message_at,
+          pending_approval_count, pending_user_input_count, has_actionable_proposed_plan,
+          created_at, updated_at, deleted_at
+        )
+        VALUES (
+          'thread-window', 'project-window', 'Window Thread',
+          '{"provider":"codex","model":"gpt-5-codex"}', 'full-access', 'default',
+          NULL, NULL, NULL, NULL, 0, 0, 0,
+          '2026-05-01T00:00:02.000Z', '2026-05-01T00:00:03.000Z', NULL
+        )
+      `;
+
+      // Five messages m0..m4 at 00:00:10..00:00:14, one activity aligned to each.
+      for (let i = 0; i < 5; i += 1) {
+        const at = `2026-05-01T00:00:${String(10 + i).padStart(2, "0")}.000Z`;
+        yield* sql`
+          INSERT INTO projection_thread_messages (
+            message_id, thread_id, turn_id, role, text, is_streaming, created_at, updated_at
+          )
+          VALUES (${`m${i}`}, 'thread-window', NULL, 'user', ${`msg ${i}`}, 0, ${at}, ${at})
+        `;
+        yield* sql`
+          INSERT INTO projection_thread_activities (
+            activity_id, thread_id, turn_id, tone, kind, summary, payload_json, sequence, created_at
+          )
+          VALUES (${`a${i}`}, 'thread-window', NULL, 'info', 'runtime.note', ${`act ${i}`}, '{}', NULL, ${at})
+        `;
+      }
+
+      let sequence = 7;
+      for (const projector of Object.values(ORCHESTRATION_PROJECTOR_NAMES)) {
+        yield* sql`
+          INSERT INTO projection_state (projector, last_applied_sequence, updated_at)
+          VALUES (${projector}, ${sequence}, '2026-05-01T00:00:20.000Z')
+        `;
+        sequence += 1;
+      }
+
+      // Window to the latest 2 messages: m3, m4 (ASC), with more history before.
+      const windowed = yield* snapshotQuery.getThreadWindowSnapshot(
+        ThreadId.make("thread-window"),
+        2,
+      );
+      assert.equal(windowed._tag, "Some");
+      if (windowed._tag === "Some") {
+        assert.equal(windowed.value.snapshotSequence, 7);
+        assert.deepEqual(
+          windowed.value.thread.messages.map((m) => m.id),
+          [asMessageId("m3"), asMessageId("m4")],
+        );
+        // Activities are trimmed to the window's time range (>= m3.createdAt).
+        assert.deepEqual(
+          windowed.value.thread.activities.map((a) => a.id),
+          [asEventId("a3"), asEventId("a4")],
+        );
+        assert.equal(windowed.value.messageWindow?.hasMoreBefore, true);
+        assert.equal(windowed.value.messageWindow?.oldestMessageId, asMessageId("m3"));
+      }
+
+      // Page strictly older than m3 (limit 2): m1, m2; more history before m1.
+      const firstPage = yield* snapshotQuery.getThreadMessagePageBefore({
+        threadId: ThreadId.make("thread-window"),
+        beforeMessageId: MessageId.make("m3"),
+        limit: 2,
+      });
+      assert.equal(firstPage._tag, "Some");
+      if (firstPage._tag === "Some") {
+        assert.equal(firstPage.value.snapshotSequence, 7);
+        assert.deepEqual(
+          firstPage.value.messages.map((m) => m.id),
+          [asMessageId("m1"), asMessageId("m2")],
+        );
+        // Activities within [m1.createdAt, m3.createdAt): a1, a2.
+        assert.deepEqual(
+          firstPage.value.activities.map((a) => a.id),
+          [asEventId("a1"), asEventId("a2")],
+        );
+        assert.equal(firstPage.value.hasMoreBefore, true);
+        assert.equal(firstPage.value.oldestMessageId, asMessageId("m1"));
+      }
+
+      // Page before m1 (limit 2): only m0 remains; end of history.
+      const lastPage = yield* snapshotQuery.getThreadMessagePageBefore({
+        threadId: ThreadId.make("thread-window"),
+        beforeMessageId: MessageId.make("m1"),
+        limit: 2,
+      });
+      assert.equal(lastPage._tag, "Some");
+      if (lastPage._tag === "Some") {
+        assert.deepEqual(
+          lastPage.value.messages.map((m) => m.id),
+          [asMessageId("m0")],
+        );
+        assert.equal(lastPage.value.hasMoreBefore, false);
+        assert.equal(lastPage.value.oldestMessageId, asMessageId("m0"));
+      }
+
+      // Page before the first message: empty, end of history.
+      const emptyPage = yield* snapshotQuery.getThreadMessagePageBefore({
+        threadId: ThreadId.make("thread-window"),
+        beforeMessageId: MessageId.make("m0"),
+        limit: 2,
+      });
+      assert.equal(emptyPage._tag, "Some");
+      if (emptyPage._tag === "Some") {
+        assert.equal(emptyPage.value.messages.length, 0);
+        assert.equal(emptyPage.value.hasMoreBefore, false);
+        assert.equal(emptyPage.value.oldestMessageId, null);
+      }
+
+      // A thread that fits entirely within the window reports no more history.
+      const fullyInWindow = yield* snapshotQuery.getThreadWindowSnapshot(
+        ThreadId.make("thread-window"),
+        60,
+      );
+      assert.equal(fullyInWindow._tag, "Some");
+      if (fullyInWindow._tag === "Some") {
+        assert.equal(fullyInWindow.value.thread.messages.length, 5);
+        assert.equal(fullyInWindow.value.messageWindow?.hasMoreBefore, false);
+        assert.equal(fullyInWindow.value.messageWindow?.oldestMessageId, asMessageId("m0"));
+      }
+    }),
+  );
 });
 
 it.effect(

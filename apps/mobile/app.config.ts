@@ -1,7 +1,21 @@
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
+
 import type { ExpoConfig } from "expo/config";
 
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
+
+// Android FCM is only wired when a Firebase config is present. Self-hosted
+// users drop apps/mobile/google-services.json in to enable push; builds
+// without it still work (no push token is requested on Android). Expo runs
+// this config from the app directory, so resolve against the working dir
+// (avoid import.meta so the CJS config loader keeps working).
+const googleServicesFile = NodeFS.existsSync(
+  NodePath.resolve(process.cwd(), "google-services.json"),
+)
+  ? "./google-services.json"
+  : undefined;
 
 type AppVariant = "development" | "preview" | "production";
 
@@ -10,6 +24,9 @@ Object.assign(process.env, repoEnv);
 
 const APP_VARIANT = resolveAppVariant(repoEnv.APP_VARIANT);
 const isIosPersonalTeamBuild = repoEnv.T3CODE_IOS_PERSONAL_TEAM === "1";
+// Self-hosted/source builds can opt out of the official Expo OTA update channel
+// (owned by pingdotgg) so the app never checks it and always runs the embedded bundle.
+const updatesEnabled = repoEnv.T3CODE_DISABLE_UPDATES !== "1";
 
 const personalTeamBundleIdentifier = repoEnv.T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID?.trim();
 const IOS_BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
@@ -173,7 +190,7 @@ const config: ExpoConfig = {
   icon: variant.assets.appIcon,
   userInterfaceStyle: "automatic",
   updates: {
-    enabled: true,
+    enabled: updatesEnabled,
     url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454",
     checkAutomatically: "ON_LOAD",
     fallbackToCacheTimeout: 0,
@@ -202,6 +219,10 @@ const config: ExpoConfig = {
   android: {
     icon: variant.assets.appIcon,
     package: variant.androidPackage,
+    // Only the production package (com.t3tools.t3code) is registered in
+    // google-services.json, so only wire FCM there. dev/preview variants build
+    // without it (and don't need push).
+    ...(googleServicesFile && APP_VARIANT === "production" ? { googleServicesFile } : {}),
     adaptiveIcon: {
       backgroundColor: variant.assets.androidAdaptiveBackgroundColor,
       foregroundImage: variant.assets.androidAdaptiveForeground,
