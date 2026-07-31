@@ -46,6 +46,7 @@ const makeProjectionSnapshotQueryLayer = (project: OrchestrationProject) =>
     getThreadDetailSnapshot: () => Effect.die("unused"),
     getThreadWindowSnapshot: () => Effect.succeed(Option.none()),
     getThreadMessagePageBefore: () => Effect.succeed(Option.none()),
+    searchThreads: () => Effect.succeed({ matches: [] }),
   });
 
 const makeTerminalManagerLayer = (

@@ -99,6 +99,7 @@ it.effect("launchStartupHeartbeat does not block the caller while counts are loa
           getThreadDetailSnapshot: () => Effect.succeed(Option.none()),
           getThreadWindowSnapshot: () => Effect.succeed(Option.none()),
           getThreadMessagePageBefore: () => Effect.succeed(Option.none()),
+          searchThreads: () => Effect.succeed({ matches: [] }),
         }),
         Effect.provideService(AnalyticsService.AnalyticsService, {
           record: () => Effect.void,
@@ -164,6 +165,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets returns existing project and threa
         getThreadDetailSnapshot: () => Effect.die("unused"),
         getThreadWindowSnapshot: () => Effect.succeed(Option.none()),
         getThreadMessagePageBefore: () => Effect.succeed(Option.none()),
+        searchThreads: () => Effect.succeed({ matches: [] }),
       }),
       Effect.provideService(OrchestrationEngine.OrchestrationEngineService, {
         readEvents: () => Stream.empty,
@@ -210,6 +212,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets creates a project and thread when 
         getThreadDetailSnapshot: () => Effect.die("unused"),
         getThreadWindowSnapshot: () => Effect.succeed(Option.none()),
         getThreadMessagePageBefore: () => Effect.succeed(Option.none()),
+        searchThreads: () => Effect.succeed({ matches: [] }),
       }),
       Effect.provideService(OrchestrationEngine.OrchestrationEngineService, {
         readEvents: () => Stream.empty,
@@ -262,6 +265,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets preserves typed UUID generation fa
         getThreadDetailSnapshot: () => Effect.die("unused"),
         getThreadWindowSnapshot: () => Effect.succeed(Option.none()),
         getThreadMessagePageBefore: () => Effect.succeed(Option.none()),
+        searchThreads: () => Effect.succeed({ matches: [] }),
       }),
       Effect.provideService(OrchestrationEngine.OrchestrationEngineService, {
         readEvents: () => Stream.empty,

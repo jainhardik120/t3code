@@ -1,0 +1,46 @@
+# Reproduction harness for slow large-thread loading.
+#
+# The server BUNDLE is mounted from apps/server/dist (built on the host with
+# `vp run --filter t3 build:bundle`). To iterate on server code:
+#   1. edit apps/server/src/...
+#   2. `vp run --filter t3 build:bundle`   (~1s)
+#   3. `docker compose -f infra/repro/docker-compose.yml restart`
+# No image rebuild needed — dist is a live volume.
+#
+# Data is the trimmed fixture in ./.data (built by seed-fixture.sh).
+# Reachable from an Android emulator at http://10.0.2.2:3810.
+services:
+  t3-repro:
+    # ubuntu:26.04 matches the host's glibc (2.43), so host-compiled native
+    # modules (node-pty) load. We reuse the host's Node runtime too, so there's
+    # no image to build — just bind mounts.
+    image: ubuntu:26.04
+    container_name: t3-repro
+    # Run as the host user so files the server writes into ./.data stay
+    # host-owned (otherwise Metro, running as the host user, hits EACCES).
+    user: "1000:1000"
+    working_dir: /app
+    command:
+      - /hostnode/bin/node
+      - /repo/apps/server/dist/bin.mjs
+      - serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - "3773"
+      - --base-dir
+      - /data
+      - /workspace
+    volumes:
+      # Whole repo read-only: the bundle in apps/server/dist and the pnpm
+      # node_modules (relative symlinks + .pnpm store) resolve at their natural
+      # paths. Rebuild dist on the host (`vp run --filter t3 build:bundle`) then
+      # `docker compose restart` — no image rebuild.
+      - ../..:/repo:ro
+      # Host Node runtime (glibc-compatible with the base image).
+      - /home/jainhardik120/.vite-plus/js_runtime/node/24.18.0:/hostnode:ro
+      - ./.data:/data
+      - ./workspace:/workspace
+    ports:
+      - "3810:3773"
+    restart: unless-stopped

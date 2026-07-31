@@ -1,0 +1,5 @@
+# Generated fixture (contains real thread data) — never commit.
+.data/
+# Scratch workspace mounted into the container.
+workspace/*
+!workspace/.gitkeep
