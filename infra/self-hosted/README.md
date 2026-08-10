@@ -49,9 +49,16 @@ So "merge our two branches into upstream" is really: **merge `origin/main` into
 ./infra/self-hosted/sync-upstream.sh
 ```
 
-Requires a clean tree and that you're on the integration branch. It tags
-`premerge/<stamp>` before merging, so `git reset --hard premerge/<stamp>` always
-gets you back.
+Requires a clean tree and that you're on the integration branch. It records the
+pre-merge commit as `refs/premerge/<stamp>` first, so
+
+```
+git for-each-ref --format='%(refname) %(objectname:short)' refs/premerge
+git reset --hard <that sha>
+```
+
+always gets you back. (A ref, not a tag — this repo sets `tag.gpgsign`, which
+makes `git tag` demand a message and a signing key.)
 
 ### Conflict rules that keep recurring
 
@@ -108,24 +115,32 @@ pnpm --filter t3 test
    release if it fails
 7. prune to the last 3 releases
 
-`./infra/self-hosted/release.sh --no-restart` stops after step 4, and prints the
-`--finish-release <dir>` command to do the swap later.
-
-### Releasing from a shell hosted by t3code itself
+### It runs in the background, as a systemd unit
 
 `systemctl restart` kills every process in the service's cgroup — which includes
-any terminal or agent session running _inside_ T3 Code. Releasing from there would
-kill the release script at the moment it restarts, so the health check and
-auto-rollback would never run.
+any terminal or agent session running _inside_ T3 Code. A release driven from
+there would be killed at the moment it restarts the service, so the health check
+and auto-rollback would never run.
 
-`release.sh` detects this (`/proc/self/cgroup` contains `t3code.service`) and hands
-steps 5–7 to a transient systemd unit owned by the user manager, then exits. The
-restart still happens, still health-checks, still rolls back on failure — but your
-session dies mid-way, so watch it from outside:
+So `release.sh` and `rollback.sh` re-launch themselves as a transient unit owned
+by the **user manager**, outside the service cgroup, and return immediately. The
+work continues even though the shell that started it is gone:
 
 ```
+./infra/self-hosted/release.sh          # starts t3code-release-<stamp>, returns
+./infra/self-hosted/release.sh --follow # tail the newest release unit
 journalctl --user -u t3code-release-<stamp> -f
+systemctl --user status t3code-release-<stamp>
 ```
+
+Other flags:
+
+| flag               | effect                                                           |
+| ------------------ | ---------------------------------------------------------------- |
+| `--foreground`     | run inline and block; only safe from a shell outside the service |
+| `--no-restart`     | build and package, leave the service alone                       |
+| `--activate <dir>` | skip the build, just point `current` at an existing release      |
+| `--follow`         | tail the newest release unit's journal                           |
 
 ### Never run `pnpm --filter t3 build`
 
@@ -159,12 +174,20 @@ pnpm ≥10 refuses to deploy without it.
 ## Rollback
 
 ```
-./infra/self-hosted/rollback.sh          # previous release
+./infra/self-hosted/rollback.sh --list   # * = live, < = rollback target, ! = incomplete
+./infra/self-hosted/rollback.sh          # back to the rollback target
 ./infra/self-hosted/rollback.sh 20260810-192500-abc1234
-ls -1t ~/.local/share/t3code/releases
 ```
 
-Each release has a `RELEASE_INFO` file with the commit it was built from.
+Each release directory carries two markers: `RELEASE_INFO` (the commit it was
+built from) and `PREVIOUS` (the release that was live when it was activated).
+Rollback follows `PREVIOUS` rather than guessing from timestamps, so it lands on
+the release that was actually running before — and refuses any target that is
+incomplete or already live. Rolling back twice returns you to where you started.
+
+`release.sh` performs the same rollback automatically when a new release fails
+its health check, and only reports success once the service answers on
+`$T3_HEALTH_URL`. Pruning never removes the live release or its rollback target.
 
 Note that rollback does **not** revert database migrations. A release that ran a
 new migration and then got rolled back leaves the schema ahead of the code; that's

@@ -1,122 +1,79 @@
 #!/usr/bin/env bash
 # Step 2 of the self-hosted upgrade recipe: build, package standalone, restart.
 #
-#   ./infra/self-hosted/release.sh                # full release
-#   ./infra/self-hosted/release.sh --no-restart   # build + package, don't touch the service
-#   ./infra/self-hosted/release.sh --finish-release <dir>   # (internal) swap + restart only
+#   ./infra/self-hosted/release.sh              # background release (default)
+#   ./infra/self-hosted/release.sh --foreground # run inline, blocking
+#   ./infra/self-hosted/release.sh --no-restart # build + package only
+#   ./infra/self-hosted/release.sh --follow     # tail the newest release unit
+#   ./infra/self-hosted/release.sh --activate <dir>   # activate an existing release
 #
-# Produces a self-contained release under ~/.local/share/t3code/releases/<stamp>,
-# flips the `current` symlink, restarts the systemd unit, and rolls back
-# automatically if the new release fails its health check.
+# The default run is a transient systemd user unit, so restarting the service
+# cannot kill the deploy that is driving it. See common.sh.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SELF="$REPO_ROOT/infra/self-hosted/release.sh"
-DEPLOY_ROOT="${T3_DEPLOY_ROOT:-$HOME/.local/share/t3code}"
-RELEASES_DIR="$DEPLOY_ROOT/releases"
-CURRENT_LINK="$DEPLOY_ROOT/current"
-SERVICE="${T3_SERVICE:-t3code}"
-HEALTH_URL="${T3_HEALTH_URL:-http://127.0.0.1:3773/}"
-KEEP_RELEASES="${T3_KEEP_RELEASES:-3}"
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+SELF="$SCRIPT_DIR/release.sh"
+
+FOREGROUND=0
 RESTART=1
-FINISH_DIR=""
+INLINE=0
+STAMP=""
+ACTIVATE_DIR=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --foreground | -f) FOREGROUND=1 ;;
     --no-restart) RESTART=0 ;;
-    --finish-release) FINISH_DIR="${2:?--finish-release needs a directory}"; shift ;;
+    --activate) ACTIVATE_DIR="${2:?--activate needs a release directory}"; shift ;;
+    --follow)
+      unit="$(systemctl --user list-units --all --plain --no-legend 't3code-release-*' |
+        awk '{print $1}' | sort | tail -1)"
+      [ -n "${unit:-}" ] || die "no release unit found"
+      exec journalctl --user -u "${unit%.service}" -f
+      ;;
+    --stamp) STAMP="${2:?}"; shift ;;      # internal
+    --inline) INLINE=1 ;;                  # internal: the detached unit's entry point
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
   shift
 done
 
-say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
-warn() { printf '\033[1;33mWARN: %s\033[0m\n' "$*" >&2; }
-die() { printf '\n\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
-
-# ---------------------------------------------------------------------------
-# Swap the symlink, restart, health check, roll back on failure, prune.
-#
-# Split into its own entry point because restarting the service kills every
-# process in its cgroup — including this script, when it is run from a terminal
-# or agent session hosted by t3code itself. See the dispatcher at the bottom.
-# ---------------------------------------------------------------------------
-finish_release() {
-  local release_dir="$1"
-  [ -d "$release_dir" ] || die "no such release: $release_dir"
-
-  local previous=""
-  if [ -L "$CURRENT_LINK" ]; then previous="$(readlink -f "$CURRENT_LINK")"; fi
-
-  local exec_start
-  exec_start="$(systemctl --user show "$SERVICE" -p ExecStart --value 2>/dev/null || true)"
-  case "$exec_start" in
-    *"$CURRENT_LINK"*) ;;
-    "") die "systemd unit '$SERVICE' not found — run ./infra/self-hosted/install-service.sh first" ;;
-    *) die "unit '$SERVICE' does not run from $CURRENT_LINK — run ./infra/self-hosted/install-service.sh first" ;;
-  esac
-
-  say "Pointing current -> $release_dir and restarting $SERVICE"
-  ln -sfn "$release_dir" "$CURRENT_LINK.tmp"
-  mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
-  systemctl --user restart "$SERVICE"
-
-  say "Health check"
-  local healthy=0
-  for _ in $(seq 1 30); do
-    if curl -fsS -o /dev/null --max-time 3 "$HEALTH_URL"; then healthy=1; break; fi
-    sleep 2
-  done
-
-  if [ "$healthy" -ne 1 ]; then
-    warn "health check failed against $HEALTH_URL"
-    if [ -n "$previous" ] && [ -d "$previous" ]; then
-      warn "rolling back to $previous"
-      ln -sfn "$previous" "$CURRENT_LINK.tmp"
-      mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
-      systemctl --user restart "$SERVICE"
-      sleep 3
-    fi
-    echo
-    systemctl --user status "$SERVICE" --no-pager --lines 30 || true
-    die "release failed; see 'journalctl --user -u $SERVICE -n 100'"
+if [ -n "$ACTIVATE_DIR" ]; then
+  ACTIVATE_DIR="$(readlink -f "$ACTIVATE_DIR")"
+  if [ "$FOREGROUND" -eq 1 ] || [ "$INLINE" -eq 1 ]; then
+    activate "$ACTIVATE_DIR"
+    prune_releases
+  else
+    detach "t3code-release-$(date +%Y%m%d-%H%M%S)" "$SELF" --inline --activate "$ACTIVATE_DIR"
   fi
-
-  say "Pruning old releases (keeping $KEEP_RELEASES)"
-  local keep_target
-  keep_target="$(readlink -f "$CURRENT_LINK")"
-  # shellcheck disable=SC2012
-  ls -1dt "$RELEASES_DIR"/*/ 2>/dev/null | tail -n +"$((KEEP_RELEASES + 1))" | while read -r old; do
-    old="${old%/}"
-    [ "$(readlink -f "$old")" = "$keep_target" ] && continue
-    echo "removing $old"
-    rm -rf "$old"
-  done
-
-  say "Live on $(basename "$release_dir")"
-  cat "$release_dir/RELEASE_INFO" 2>/dev/null || true
-}
-
-if [ -n "$FINISH_DIR" ]; then
-  finish_release "$FINISH_DIR"
   exit 0
 fi
 
 cd "$REPO_ROOT"
 
-# --- preflight -------------------------------------------------------------
+# --- preflight (cheap, run before detaching so mistakes surface immediately) ---
 
-say "Preflight"
 [ -z "$(git ls-files -u)" ] || die "unresolved merge conflicts — finish the merge first"
 command -v vp >/dev/null || die "vp (vite-plus) not on PATH"
 command -v pnpm >/dev/null || die "pnpm not on PATH"
+[ "$RESTART" -eq 0 ] || assert_unit_uses_symlink
 
+STAMP="${STAMP:-$(date +%Y%m%d-%H%M%S)}"
 sha="$(git rev-parse --short HEAD)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
-stamp="$(date +%Y%m%d-%H%M%S)"
-release_dir="$RELEASES_DIR/$stamp-$sha"
-echo "branch=$branch sha=$sha -> $release_dir"
+release_dir="$RELEASES_DIR/$STAMP-$sha"
 
+if [ "$INLINE" -eq 0 ] && [ "$FOREGROUND" -eq 0 ]; then
+  args=(--inline --stamp "$STAMP")
+  [ "$RESTART" -eq 0 ] && args+=(--no-restart)
+  echo "Releasing $branch @ $sha -> $(basename "$release_dir")"
+  detach "t3code-release-$STAMP" "$SELF" "${args[@]}"
+  exit 0
+fi
+
+say "Preflight"
+echo "branch=$branch sha=$sha -> $release_dir"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   warn "working tree has uncommitted changes — they WILL be included in this release"
 fi
@@ -134,7 +91,7 @@ pnpm install
 #
 # `vp run --filter t3 build` runs apps/server/scripts/cli.ts build, which packs
 # dist/bin.mjs and copies apps/web/dist into apps/server/dist/client. Use vp, not
-# `pnpm --filter t3 build` (see above).
+# `pnpm --filter t3 build` (see README).
 
 say "Building server + web client"
 vp run --filter t3 build
@@ -147,58 +104,38 @@ vp run --filter t3 build
 #
 # --legacy is required: the workspace does not set inject-workspace-packages,
 # and pnpm >=10 refuses to deploy without it. --prod drops devDependencies;
-# everything the bundle actually imports at runtime (effect, the agent SDK,
-# node-pty's native binding) is a prod dep.
+# everything the bundle imports at runtime (effect, the agent SDK, node-pty's
+# native binding) is a prod dep.
 
 say "Packaging standalone release"
 rm -rf "$release_dir"
 mkdir -p "$RELEASES_DIR"
 pnpm --filter t3 deploy --prod --legacy "$release_dir"
 
-[ -f "$release_dir/dist/client/index.html" ] || die "release is missing the web client"
-[ -f "$release_dir/node_modules/node-pty/build/Release/pty.node" ] ||
-  die "release is missing node-pty's native binding"
+release_is_complete "$release_dir" ||
+  die "packaged release is missing the web client or node-pty's native binding"
 
-git log -1 --format='%H%n%s%n%ad' --date=iso > "$release_dir/RELEASE_INFO"
-echo "branch: $branch" >> "$release_dir/RELEASE_INFO"
+{
+  git log -1 --format='%H%n%s%n%ad' --date=iso
+  echo "branch: $branch"
+} > "$release_dir/RELEASE_INFO"
 
 say "Smoke testing the packaged binary"
 node "$release_dir/dist/bin.mjs" --version
 
 if [ "$RESTART" -eq 0 ]; then
-  say "Built and packaged at $release_dir (--no-restart; service untouched)"
-  echo "Finish later with: $SELF --finish-release $release_dir"
+  say "Built and packaged at $release_dir (--no-restart)"
+  echo "Activate later with: $SELF --activate $release_dir"
   exit 0
 fi
 
-# --- restart ---------------------------------------------------------------
-#
-# If this shell lives inside the service's own cgroup (a terminal or agent
-# session hosted by the running t3code), restarting from here would kill this
-# script mid-flight, so the health check and auto-rollback would never run. Hand
-# the last phase to a transient unit owned by the user manager instead.
+activate "$release_dir"
+prune_releases
 
-if grep -qs "$SERVICE.service" /proc/self/cgroup; then
-  unit="t3code-release-$stamp"
-  say "This shell runs inside $SERVICE.service — handing off restart to $unit"
-  systemd-run --user --collect --unit "$unit" \
-    --description "T3 Code release $stamp" \
-    /usr/bin/env bash "$SELF" --finish-release "$release_dir"
-  cat <<EOF
+cat <<EOF
 
-Restart is running detached; this session is about to be killed by it.
-Follow along from a shell outside the service:
+Released $sha. Rollback with: $SCRIPT_DIR/rollback.sh
 
-    journalctl --user -u $unit -f
-    systemctl --user status $SERVICE
-
-Rollback if needed: ./infra/self-hosted/rollback.sh
+If contracts (packages/contracts) changed, the Android APK needs a rebuild too —
+the mobile client talks the same RPC schema.
 EOF
-  exit 0
-fi
-
-finish_release "$release_dir"
-
-echo
-echo "If contracts (packages/contracts) changed, the Android APK needs a rebuild too —"
-echo "the mobile client talks the same RPC schema."

@@ -35,8 +35,13 @@ if [ "$behind" -eq 0 ]; then
 fi
 
 say "$behind new upstream commits; recording pre-merge state"
-git tag -f "premerge/$(date +%Y%m%d-%H%M%S)" HEAD >/dev/null
-echo "Recovery: git reset --hard $(git rev-parse --short HEAD) undoes the merge."
+# A ref, not a tag: this repo sets tag.gpgsign, which makes every `git tag`
+# annotated and signed, so a lightweight marker tag fails with "no tag message".
+premerge_ref="refs/premerge/$(date +%Y%m%d-%H%M%S)"
+git update-ref "$premerge_ref" HEAD
+echo "Pre-merge state saved as $premerge_ref"
+echo "Recovery: git reset --hard $(git rev-parse --short HEAD)"
+echo "List markers: git for-each-ref --format='%(refname) %(objectname:short)' refs/premerge"
 
 say "Merging origin/main into $INTEGRATION_BRANCH"
 if git merge origin/main --no-edit; then
