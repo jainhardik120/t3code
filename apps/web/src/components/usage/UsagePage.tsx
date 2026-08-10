@@ -1,5 +1,6 @@
 import type { UsageProviderKind } from "@t3tools/contracts";
-import { CheckIcon, RefreshCwIcon, XIcon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { CheckIcon, ExternalLinkIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { isElectron } from "../../env";
@@ -403,15 +404,19 @@ function projectLabel(projectPath: string): string {
   return segments.slice(-2).join("/");
 }
 
-/** Usage per working directory, costliest first. */
+/** Usage per working directory, with one column per harness. */
 function ProjectBreakdown({ projects }: { readonly projects: readonly ProjectTotals[] }) {
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-border text-left text-xs text-muted-foreground">
           <th className="py-2 font-normal">Project</th>
-          <th className="py-2 text-right font-normal">Cost</th>
-          <th className="py-2 text-right font-normal">Share</th>
+          {PROVIDER_ORDER.map((provider) => (
+            <th key={provider} className="py-2 text-right font-normal">
+              {PROVIDER_LABEL[provider]}
+            </th>
+          ))}
+          <th className="py-2 text-right font-normal">Total</th>
           <th className="py-2 text-right font-normal">Tokens</th>
           <th className="py-2 text-right font-normal">Sessions</th>
         </tr>
@@ -419,29 +424,28 @@ function ProjectBreakdown({ projects }: { readonly projects: readonly ProjectTot
       <tbody>
         {projects.length === 0 ? (
           <tr>
-            <td colSpan={5} className="py-6 text-center text-muted-foreground">
+            <td
+              colSpan={PROVIDER_ORDER.length + 4}
+              className="py-6 text-center text-muted-foreground"
+            >
               No activity in this window.
             </td>
           </tr>
         ) : (
           projects.map((project) => (
-            <tr
-              key={`${project.provider}:${project.projectPath}`}
-              className="border-b border-border/50"
-            >
+            <tr key={project.projectPath} className="border-b border-border/50">
               <td className="py-2 text-foreground">
-                <span className="flex items-center gap-2">
-                  <ProviderMark provider={project.provider} className="size-3.5" />
-                  <span className="truncate" title={project.projectPath || "Unknown project"}>
-                    {projectLabel(project.projectPath)}
-                  </span>
+                <span className="truncate" title={project.projectPath || "Unknown project"}>
+                  {projectLabel(project.projectPath)}
                 </span>
               </td>
+              {PROVIDER_ORDER.map((provider) => (
+                <td key={provider} className="py-2 text-right text-muted-foreground tabular-nums">
+                  {formatUsd(project.byProvider.get(provider)?.costUsd ?? 0)}
+                </td>
+              ))}
               <td className="py-2 text-right text-foreground tabular-nums">
                 {formatUsd(project.costUsd)}
-              </td>
-              <td className="py-2 text-right text-muted-foreground tabular-nums">
-                {formatPercent(project.costShare)}
               </td>
               <td className="py-2 text-right text-muted-foreground tabular-nums">
                 {formatTokens(project.totalTokens)}
@@ -457,7 +461,13 @@ function ProjectBreakdown({ projects }: { readonly projects: readonly ProjectTot
   );
 }
 
-/** Usage per transcript session, costliest first. */
+/**
+ * Usage per transcript session, costliest first.
+ *
+ * A session that T3 Code drove links to its thread and shows that thread's
+ * title. Sessions started outside T3 Code have neither: an identical transcript
+ * with nothing on this server to open, so they stay plain rows.
+ */
 function SessionBreakdown({ sessions }: { readonly sessions: readonly SessionTotals[] }) {
   const shown = sessions.slice(0, SESSION_ROW_LIMIT);
   const hidden = sessions.length - shown.length;
@@ -484,15 +494,10 @@ function SessionBreakdown({ sessions }: { readonly sessions: readonly SessionTot
           ) : (
             shown.map((session) => (
               <tr key={session.sessionId} className="border-b border-border/50">
-                <td className="py-2 text-foreground">
+                <td className="max-w-0 py-2 text-foreground">
                   <span className="flex items-center gap-2">
                     <ProviderMark provider={session.provider} className="size-3.5" />
-                    <span
-                      className="font-mono text-xs"
-                      title={`${session.sessionId}\n${session.models.join(", ")}`}
-                    >
-                      {session.sessionId.slice(0, 8)}
-                    </span>
+                    <SessionLabel session={session} />
                   </span>
                 </td>
                 <td className="py-2 text-muted-foreground">
@@ -521,6 +526,41 @@ function SessionBreakdown({ sessions }: { readonly sessions: readonly SessionTot
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * A session's name, linked to its thread when there is one.
+ *
+ * Opens in a new tab so reading the table is not interrupted by navigating away
+ * from it.
+ */
+function SessionLabel({ session }: { readonly session: SessionTotals }) {
+  const title = session.threadTitle ?? null;
+  const tooltip = `${session.sessionId}\n${session.models.join(", ")}`;
+
+  if (session.threadId === null || session.environmentId === null) {
+    return (
+      <span className="truncate" title={tooltip}>
+        {title ?? <span className="font-mono text-xs">{session.sessionId.slice(0, 8)}</span>}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      to="/$environmentId/$threadId"
+      params={{ environmentId: session.environmentId, threadId: session.threadId }}
+      target="_blank"
+      rel="noreferrer"
+      title={tooltip}
+      className="flex min-w-0 items-center gap-1.5 truncate text-foreground hover:underline"
+    >
+      <span className="truncate">
+        {title ?? <span className="font-mono text-xs">{session.sessionId.slice(0, 8)}</span>}
+      </span>
+      <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
+    </Link>
   );
 }
 

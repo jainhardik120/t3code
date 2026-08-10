@@ -261,7 +261,13 @@ const ProviderLayerLive = ProviderServiceLive.pipe(
   Layer.provideMerge(ProviderSessionDirectoryLayerLive),
 );
 
-const PersistenceLayerLive = PushDevices.layer.pipe(Layer.provideMerge(SqlitePersistenceLayerLive));
+// ProviderSessionRuntime is also provided into ProviderSessionDirectoryLayerLive;
+// it is merged here as well so the RPC surface can resolve a transcript session
+// back to its thread for the usage page. The repository is stateless, so a
+// second instance costs nothing.
+const PersistenceLayerLive = Layer.mergeAll(PushDevices.layer, ProviderSessionRuntime.layer).pipe(
+  Layer.provideMerge(SqlitePersistenceLayerLive),
+);
 
 const VcsDriverRegistryLayerLive = VcsDriverRegistry.layer.pipe(
   Layer.provide(VcsProjectConfig.layer),

@@ -111,6 +111,7 @@ import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngi
 import { OrchestrationListenerCallbackError } from "./orchestration/Errors.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import { SqlitePersistenceMemory } from "./persistence/Layers/Sqlite.ts";
+import * as ProviderSessionRuntime from "./persistence/ProviderSessionRuntime.ts";
 import * as PushDevices from "./persistence/PushDevices.ts";
 import { PersistenceSqlError } from "./persistence/Errors.ts";
 import * as ProviderRegistry from "./provider/Services/ProviderRegistry.ts";
@@ -949,6 +950,8 @@ const buildAppUnderTest = (options?: {
       ),
       Layer.provideMerge(makeAuthTestLayer()),
       Layer.provideMerge(PushDevices.layer.pipe(Layer.provide(SqlitePersistenceMemory))),
+      // The usage RPC resolves transcript sessions back to their threads.
+      Layer.provideMerge(ProviderSessionRuntime.layer.pipe(Layer.provide(SqlitePersistenceMemory))),
       Layer.provideMerge(ServerSecretStore.layer),
       Layer.provide(workspaceAndProjectServicesLayer),
       Layer.provideMerge(FetchHttpClient.layer),

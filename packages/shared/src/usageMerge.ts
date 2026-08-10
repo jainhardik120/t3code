@@ -42,12 +42,16 @@ export interface ModelTotals {
 
 export interface ProjectTotals {
   readonly projectPath: string;
-  readonly provider: UsageProviderKind;
   readonly costUsd: number;
   readonly totalTokens: number;
   readonly records: number;
   readonly sessions: number;
   readonly costShare: number;
+  /**
+   * Split per harness so the table can column them like the day view. A project
+   * worked on with both CLIs is one row, not one per provider.
+   */
+  readonly byProvider: ReadonlyMap<UsageProviderKind, { costUsd: number; totalTokens: number }>;
   readonly firstDay: string;
   readonly lastDay: string;
 }
@@ -63,6 +67,14 @@ export interface SessionTotals {
   readonly costShare: number;
   readonly firstDay: string;
   readonly lastDay: string;
+  /**
+   * Thread this session drove, and the environment that owns it. Both are
+   * needed to build a link: a thread id only resolves on its own environment.
+   * Null for sessions started outside T3 Code.
+   */
+  readonly threadId: string | null;
+  readonly threadTitle: string | null;
+  readonly environmentId: EnvironmentId | null;
 }
 
 export interface DailyTotals {
@@ -273,11 +285,11 @@ export function mergeUsage(
     string,
     {
       projectPath: string;
-      provider: UsageProviderKind;
       costUsd: number;
       totalTokens: number;
       records: number;
       sessions: number;
+      byProvider: Map<UsageProviderKind, { costUsd: number; totalTokens: number }>;
       firstDay: string;
       lastDay: string;
     }
@@ -293,6 +305,9 @@ export function mergeUsage(
       records: number;
       firstDay: string;
       lastDay: string;
+      threadId: string | null;
+      threadTitle: string | null;
+      environmentId: EnvironmentId | null;
     }
   >();
   const dailyAccumulator = new Map<
@@ -368,26 +383,35 @@ export function mergeUsage(
     // Two environments on different machines can legitimately report the same
     // project path; fingerprint claiming has already removed the case where
     // they are the same directory read twice, so these merge.
+    // Keyed by path alone, so one project worked on with both harnesses is a
+    // single row carrying a per-provider split.
     for (const project of environmentProjects) {
-      const key = `${project.provider} ${project.projectPath}`;
-      const existing = projectAccumulator.get(key);
+      const tokens = rowTokens(project);
+      let existing = projectAccumulator.get(project.projectPath);
       if (existing === undefined) {
-        projectAccumulator.set(key, {
+        existing = {
           projectPath: project.projectPath,
-          provider: project.provider,
-          costUsd: project.costUsd,
-          totalTokens: rowTokens(project),
-          records: project.records,
-          sessions: project.sessions,
+          costUsd: 0,
+          totalTokens: 0,
+          records: 0,
+          sessions: 0,
+          byProvider: new Map<UsageProviderKind, { costUsd: number; totalTokens: number }>(),
           firstDay: project.firstDay,
           lastDay: project.lastDay,
-        });
-        continue;
+        };
+        projectAccumulator.set(project.projectPath, existing);
       }
       existing.costUsd += project.costUsd;
-      existing.totalTokens += rowTokens(project);
+      existing.totalTokens += tokens;
       existing.records += project.records;
       existing.sessions += project.sessions;
+      const perProvider = existing.byProvider.get(project.provider) ?? {
+        costUsd: 0,
+        totalTokens: 0,
+      };
+      perProvider.costUsd += project.costUsd;
+      perProvider.totalTokens += tokens;
+      existing.byProvider.set(project.provider, perProvider);
       if (project.firstDay < existing.firstDay) existing.firstDay = project.firstDay;
       if (project.lastDay > existing.lastDay) existing.lastDay = project.lastDay;
     }
@@ -404,6 +428,10 @@ export function mergeUsage(
           records: session.records,
           firstDay: session.firstDay,
           lastDay: session.lastDay,
+          threadId: session.threadId,
+          threadTitle: session.threadTitle,
+          // Only meaningful paired with the thread id it came from.
+          environmentId: session.threadId === null ? null : environment.environmentId,
         });
         continue;
       }
@@ -413,6 +441,13 @@ export function mergeUsage(
       for (const model of session.models) existing.models.add(model);
       if (session.firstDay < existing.firstDay) existing.firstDay = session.firstDay;
       if (session.lastDay > existing.lastDay) existing.lastDay = session.lastDay;
+      // First environment to claim the thread keeps it; a second one linking the
+      // same session would be the same thread reported twice.
+      if (existing.threadId === null && session.threadId !== null) {
+        existing.threadId = session.threadId;
+        existing.threadTitle = session.threadTitle;
+        existing.environmentId = environment.environmentId;
+      }
     }
   }
 
@@ -443,7 +478,7 @@ export function mergeUsage(
   const projects: ProjectTotals[] = [...projectAccumulator.values()]
     .map((totals) => ({
       projectPath: totals.projectPath,
-      provider: totals.provider,
+      byProvider: totals.byProvider,
       costUsd: totals.costUsd,
       totalTokens: totals.totalTokens,
       records: totals.records,
@@ -466,6 +501,9 @@ export function mergeUsage(
       costShare: costUsd === 0 ? 0 : totals.costUsd / costUsd,
       firstDay: totals.firstDay,
       lastDay: totals.lastDay,
+      threadId: totals.threadId,
+      threadTitle: totals.threadTitle,
+      environmentId: totals.environmentId,
     }))
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens);
 

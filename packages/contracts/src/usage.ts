@@ -149,6 +149,16 @@ export const UsageSessionBucket = Schema.Struct({
   unpricedRecords: NonNegativeInt,
   firstDay: UsageDay,
   lastDay: UsageDay,
+  /**
+   * The T3 thread this session belongs to, when this server drove it.
+   *
+   * Null for sessions started outside T3 Code — a plain terminal run leaves an
+   * identical transcript with nothing to link to. Only meaningful alongside the
+   * environment that reported it, since thread ids are per-environment.
+   */
+  threadId: Schema.NullOr(TrimmedNonEmptyString),
+  /** Thread title for {@link threadId}, when one is known. */
+  threadTitle: Schema.NullOr(TrimmedNonEmptyString),
 });
 export type UsageSessionBucket = typeof UsageSessionBucket.Type;
 

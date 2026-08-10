@@ -77,6 +77,8 @@ function session(overrides: Partial<UsageSessionBucket> = {}): UsageSessionBucke
     unpricedRecords: 0,
     firstDay: "2026-08-07" as UsageDay,
     lastDay: "2026-08-07" as UsageDay,
+    threadId: null,
+    threadTitle: null,
     ...overrides,
   };
 }
@@ -309,6 +311,61 @@ describe("mergeUsage", () => {
     const merged = mergeUsage([], USAGE_CONTRACT_VERSION);
     expect(merged.costUsd).toBe(0);
     expect(merged.daily).toHaveLength(0);
+  });
+
+  it("keeps a session's thread link with the environment that owns it", () => {
+    const merged = mergeUsage(
+      [
+        environment(
+          "env-a",
+          summary([bucket()], [{ provider: "claude", hostId: "mac", homePath: "/a/.claude" }], 4, {
+            sessions: [
+              session({ sessionId: "linked", threadId: "t1", threadTitle: "Fix the parser" }),
+              session({ sessionId: "terminal" }),
+            ],
+          }),
+        ),
+      ],
+      USAGE_CONTRACT_VERSION,
+    );
+
+    const linked = merged.sessionTotals.find((row) => row.sessionId === "linked");
+    expect(linked?.threadId).toBe("t1");
+    // A thread id only resolves on the environment that reported it.
+    expect(linked?.environmentId).toBe("env-a");
+    const terminal = merged.sessionTotals.find((row) => row.sessionId === "terminal");
+    expect(terminal?.threadId).toBeNull();
+    expect(terminal?.environmentId).toBeNull();
+  });
+
+  it("columns a project's providers into one row", () => {
+    const merged = mergeUsage(
+      [
+        environment(
+          "env-a",
+          summary(
+            [bucket()],
+            [
+              { provider: "claude", hostId: "mac", homePath: "/a/.claude" },
+              { provider: "codex", hostId: "mac", homePath: "/a/.codex" },
+            ],
+            4,
+            {
+              projects: [
+                project({ projectPath: "/home/dev/alpha", provider: "claude", costUsd: 10 }),
+                project({ projectPath: "/home/dev/alpha", provider: "codex", costUsd: 4 }),
+              ],
+            },
+          ),
+        ),
+      ],
+      USAGE_CONTRACT_VERSION,
+    );
+
+    expect(merged.projects).toHaveLength(1);
+    expect(merged.projects[0]?.costUsd).toBe(14);
+    expect(merged.projects[0]?.byProvider.get("claude")?.costUsd).toBe(10);
+    expect(merged.projects[0]?.byProvider.get("codex")?.costUsd).toBe(4);
   });
 
   it("merges the same project reported by two machines and ranks by cost", () => {

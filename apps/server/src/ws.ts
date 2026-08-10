@@ -108,6 +108,8 @@ import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
 import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as UsageService from "./usage/UsageService.ts";
+import { attachSessionLinks, buildSessionLinks } from "./usage/usageSessionLinks.ts";
+import * as ProviderSessionRuntime from "./persistence/ProviderSessionRuntime.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as SourceControlDiscovery from "./sourceControl/SourceControlDiscovery.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
@@ -416,6 +418,7 @@ const makeWsRpcLayer = (
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
       const resourceTelemetry = yield* ResourceTelemetry.ResourceTelemetry;
       const usage = yield* UsageService.UsageService;
+      const providerSessionRuntime = yield* ProviderSessionRuntime.ProviderSessionRuntimeRepository;
       const relayClient = yield* RelayClient.RelayClient;
       const pushDevices = yield* PushDevices.PushDeviceRepository;
       const authorizationError = (requiredScope: AuthEnvironmentScope) =>
@@ -423,6 +426,25 @@ const makeWsRpcLayer = (
           message: `The authenticated token is missing required scope: ${requiredScope}.`,
           requiredScope,
         });
+      /**
+       * Usage summary, with sessions this server drove linked to their threads.
+       *
+       * A failure to resolve links must not fail the page: the numbers are the
+       * point and the labels are an enrichment, so a broken lookup degrades to
+       * unlabelled rows.
+       */
+      const readUsageSummary = (input: Parameters<typeof usage.readSummary>[0]) =>
+        Effect.gen(function* () {
+          const summary = yield* usage.readSummary(input);
+          const links = yield* Effect.gen(function* () {
+            const runtimes = yield* providerSessionRuntime.list();
+            const shells = yield* projectionSnapshotQuery.getShellSnapshot();
+            const titleByThreadId = new Map(shells.threads.map((t) => [t.id as string, t.title]));
+            return buildSessionLinks(runtimes, titleByThreadId);
+          }).pipe(Effect.catchCause(() => Effect.succeed(new Map())));
+          return attachSessionLinks(summary, links);
+        });
+
       const authorizeEffect = <A, E, R>(
         requiredScope: AuthEnvironmentScope,
         effect: Effect.Effect<A, E, R>,
@@ -1565,7 +1587,7 @@ const makeWsRpcLayer = (
             },
           ),
         [WS_METHODS.serverGetUsageSummary]: (input) =>
-          observeRpcEffect(WS_METHODS.serverGetUsageSummary, usage.readSummary(input), {
+          observeRpcEffect(WS_METHODS.serverGetUsageSummary, readUsageSummary(input), {
             "rpc.aggregate": "server",
           }),
         [WS_METHODS.serverRetryResourceTelemetry]: (_input) =>
