@@ -17,7 +17,7 @@ import type {
   OrchestrationShellSnapshot,
   OrchestrationThread,
   OrchestrationThreadDetailSnapshot,
-  OrchestrationThreadMessagePage,
+  OrchestrationThreadDetailWindow,
   OrchestrationThreadShell,
   ProjectId,
   ThreadId,
@@ -175,31 +175,17 @@ export interface ProjectionSnapshotQueryShape {
    * sequence in one consistent transaction, so the returned `snapshotSequence`
    * exactly matches the state reflected in `thread` (no interleaving projector
    * update between the two reads).
+   *
+   * When `window` is provided, the thread's messages, activities, proposed
+   * plans, and checkpoints are bounded to a page of recent turns and the
+   * response carries `page` metadata (see `OrchestrationThreadDetailWindow`).
+   * Without a window the full thread is returned with no `page` field —
+   * pagination is strictly opt-in.
    */
   readonly getThreadDetailSnapshot: (
     threadId: ThreadId,
+    window?: OrchestrationThreadDetailWindow,
   ) => Effect.Effect<Option.Option<OrchestrationThreadDetailSnapshot>, ProjectionRepositoryError>;
-
-  /**
-   * Like `getThreadDetailSnapshot` but returns only the most recent
-   * `messageLimit` messages (and the activities within that window), plus
-   * pagination metadata so clients can lazily page older messages. Large
-   * threads therefore don't ship their entire history in one payload.
-   */
-  readonly getThreadWindowSnapshot: (
-    threadId: ThreadId,
-    messageLimit: number,
-  ) => Effect.Effect<Option.Option<OrchestrationThreadDetailSnapshot>, ProjectionRepositoryError>;
-
-  /**
-   * Read a page of messages (and their activities) older than `beforeMessageId`,
-   * for "load older" scrolling. Returns the newest `limit` such messages.
-   */
-  readonly getThreadMessagePageBefore: (input: {
-    readonly threadId: ThreadId;
-    readonly beforeMessageId: string;
-    readonly limit: number;
-  }) => Effect.Effect<Option.Option<OrchestrationThreadMessagePage>, ProjectionRepositoryError>;
 }
 
 /**

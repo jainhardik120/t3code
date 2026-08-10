@@ -32,7 +32,6 @@ import {
   OrchestrationReadModel,
   OrchestrationShellSnapshot,
   OrchestrationThreadDetailSnapshot,
-  OrchestrationThreadMessagePage,
 } from "./orchestration.ts";
 import {
   RelayCloudEnvironmentHealthRequest,
@@ -458,11 +457,15 @@ const EnvironmentOrchestrationThreadSnapshotParams = Schema.Struct({
   threadId: ThreadId,
 });
 
-const EnvironmentOrchestrationThreadMessagesBeforeParams = Schema.Struct({
-  threadId: ThreadId,
-  // Cursor: return messages older than this message id (exclusive).
-  beforeMessageId: TrimmedNonEmptyString,
-});
+// Query-string window for windowed thread snapshots (GET payloads must encode
+// to strings). Both fields optional: omitting them keeps the full-snapshot
+// behavior, so pagination stays opt-in per request.
+const EnvironmentOrchestrationThreadSnapshotQuery = {
+  turnLimit: Schema.optional(
+    Schema.FiniteFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1)),
+  ),
+  beforeCursor: Schema.optional(TrimmedNonEmptyString),
+};
 
 export class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestration")
   .add(
@@ -483,32 +486,10 @@ export class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestr
     HttpApiEndpoint.get("threadSnapshot", "/api/orchestration/threads/:threadId", {
       headers: OptionalBearerHeaders,
       params: EnvironmentOrchestrationThreadSnapshotParams,
+      payload: EnvironmentOrchestrationThreadSnapshotQuery,
       success: OrchestrationThreadDetailSnapshot,
       error: EnvironmentOrchestrationThreadSnapshotErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
-  )
-  .add(
-    // Windowed initial load: returns only the latest N messages/activities plus
-    // pagination metadata, so large threads don't ship the entire history in one
-    // payload. Clients page older messages via `threadMessagesBefore`.
-    HttpApiEndpoint.get("threadWindowSnapshot", "/api/orchestration/threads/:threadId/window", {
-      headers: OptionalBearerHeaders,
-      params: EnvironmentOrchestrationThreadSnapshotParams,
-      success: OrchestrationThreadDetailSnapshot,
-      error: EnvironmentOrchestrationThreadSnapshotErrors,
-    }).middleware(EnvironmentAuthenticatedAuth),
-  )
-  .add(
-    HttpApiEndpoint.get(
-      "threadMessagesBefore",
-      "/api/orchestration/threads/:threadId/messages-before/:beforeMessageId",
-      {
-        headers: OptionalBearerHeaders,
-        params: EnvironmentOrchestrationThreadMessagesBeforeParams,
-        success: OrchestrationThreadMessagePage,
-        error: EnvironmentOrchestrationThreadSnapshotErrors,
-      },
-    ).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
     HttpApiEndpoint.post("dispatch", "/api/orchestration/dispatch", {

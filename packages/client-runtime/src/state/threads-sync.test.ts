@@ -187,7 +187,6 @@ const makeHarness = Effect.fn("TestEnvironmentThreads.makeHarness")(function* (o
             : Option.none<OrchestrationThreadDetailSnapshot>(),
         ),
       ),
-    loadOlder: () => Effect.succeed(Option.none()),
   });
   const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
     target: TARGET,
