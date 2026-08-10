@@ -714,6 +714,13 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverGetUsageSummary,
       staleTimeMs: 60_000,
     }),
+    // One transcript rather than the whole window, so this can refresh often
+    // enough to feel live while a turn is running.
+    threadUsageCost: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:thread-usage-cost",
+      tag: WS_METHODS.serverGetThreadUsageCost,
+      staleTimeMs: 15_000,
+    }),
     configProjection,
     welcome: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:server:welcome",

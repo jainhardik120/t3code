@@ -1,3 +1,6 @@
+import type { ThreadUsageCost } from "@t3tools/contracts";
+import { formatUsd } from "@t3tools/shared/usageFormat";
+
 import { cn } from "~/lib/utils";
 import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -15,8 +18,14 @@ function formatPercentage(value: number | null): string | null {
 export function ContextWindowMeter(props: {
   usage: ContextWindowSnapshot;
   providerDisplayName?: string | null;
+  /**
+   * Cost of this thread's provider session, priced from its transcript by the
+   * same code as the usage page. Null while it loads, or when the session has
+   * no transcript this server can read.
+   */
+  sessionCost?: ThreadUsageCost | null;
 }) {
-  const { usage, providerDisplayName } = props;
+  const { usage, providerDisplayName, sessionCost = null } = props;
   const usedPercentage = formatPercentage(usage.usedPercentage);
   const normalizedPercentage = Math.max(0, Math.min(100, usage.usedPercentage ?? 0));
   const radius = 9.75;
@@ -126,6 +135,22 @@ export function ContextWindowMeter(props: {
               <span className="font-medium tabular-nums text-secondary-label">
                 {formatContextWindowTokens(totalProcessedTokens)}
               </span>
+            </div>
+          ) : null}
+          {sessionCost !== null && sessionCost.costSource !== "unpriced" ? (
+            <div className="flex items-center justify-between gap-3 text-[11px] leading-4">
+              <span className="text-secondary-label">Session cost</span>
+              <span className="font-medium tabular-nums text-secondary-label">
+                {formatUsd(sessionCost.costUsd)}
+                {/* Say so when the figure is an estimate rather than the
+                    provider's own number, so it is not read as a bill. */}
+                {sessionCost.costSource === "modelPriced" ? "*" : ""}
+              </span>
+            </div>
+          ) : null}
+          {sessionCost !== null && sessionCost.costSource === "modelPriced" ? (
+            <div className="text-secondary-label text-[10px] leading-3">
+              * estimated at full API rates
             </div>
           ) : null}
           {usage.compactsAutomatically ? (

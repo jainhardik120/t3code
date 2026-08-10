@@ -14,7 +14,7 @@
  */
 import * as Schema from "effect/Schema";
 
-import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NonNegativeInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
  * Bumped whenever the shape of {@link UsageSummary} changes incompatibly. The
@@ -251,6 +251,24 @@ export const UsageSummary = Schema.Struct({
   scanDurationMs: NonNegativeInt,
 });
 export type UsageSummary = typeof UsageSummary.Type;
+
+/**
+ * Cost of the transcript session a thread is currently running.
+ *
+ * Priced by the same code as the usage page, from the same transcript, so the
+ * figure in a thread and the figure in the usage table cannot disagree.
+ */
+export const ThreadUsageCostInput = Schema.Struct({ threadId: ThreadId });
+export type ThreadUsageCostInput = typeof ThreadUsageCostInput.Type;
+
+export const ThreadUsageCost = Schema.Struct({
+  sessionId: TrimmedNonEmptyString,
+  totals: UsageTokenTotals,
+  costUsd: Schema.Number,
+  costSource: UsageCostSource,
+  records: NonNegativeInt,
+});
+export type ThreadUsageCost = typeof ThreadUsageCost.Type;
 
 export class UsageReadError extends Schema.TaggedErrorClass<UsageReadError>()("UsageReadError", {
   reason: Schema.Literals(["scanFailed", "invalidWindow"]),

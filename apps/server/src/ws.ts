@@ -108,7 +108,11 @@ import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
 import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as UsageService from "./usage/UsageService.ts";
-import { attachSessionLinks, buildSessionLinks } from "./usage/usageSessionLinks.ts";
+import {
+  attachSessionLinks,
+  buildSessionLinks,
+  resumeSessionId,
+} from "./usage/usageSessionLinks.ts";
 import * as ProviderSessionRuntime from "./persistence/ProviderSessionRuntime.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as SourceControlDiscovery from "./sourceControl/SourceControlDiscovery.ts";
@@ -443,6 +447,23 @@ const makeWsRpcLayer = (
             return buildSessionLinks(runtimes, titleByThreadId);
           }).pipe(Effect.catchCause(() => Effect.succeed(new Map())));
           return attachSessionLinks(summary, links);
+        });
+
+      /**
+       * Cost of the provider session a thread is currently on.
+       *
+       * The transcript's session id is only known to this server, through the
+       * resume cursor, so the client asks by thread and the lookup happens here.
+       */
+      const readThreadUsageCost = (input: { readonly threadId: ThreadId }) =>
+        Effect.gen(function* () {
+          const runtime = yield* providerSessionRuntime
+            .getByThreadId({ threadId: input.threadId })
+            .pipe(Effect.catchCause(() => Effect.succeed(Option.none())));
+          if (Option.isNone(runtime)) return null;
+          const sessionId = resumeSessionId(runtime.value.resumeCursor);
+          if (sessionId === null) return null;
+          return yield* usage.readSessionCost(sessionId);
         });
 
       const authorizeEffect = <A, E, R>(
@@ -1588,6 +1609,10 @@ const makeWsRpcLayer = (
           ),
         [WS_METHODS.serverGetUsageSummary]: (input) =>
           observeRpcEffect(WS_METHODS.serverGetUsageSummary, readUsageSummary(input), {
+            "rpc.aggregate": "server",
+          }),
+        [WS_METHODS.serverGetThreadUsageCost]: (input) =>
+          observeRpcEffect(WS_METHODS.serverGetThreadUsageCost, readThreadUsageCost(input), {
             "rpc.aggregate": "server",
           }),
         [WS_METHODS.serverRetryResourceTelemetry]: (_input) =>

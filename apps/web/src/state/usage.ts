@@ -10,6 +10,8 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   USAGE_CONTRACT_VERSION,
   type EnvironmentId,
+  type ThreadId,
+  type ThreadUsageCost,
   type UsageSummary,
   type UsageSummaryInput,
 } from "@t3tools/contracts";
@@ -56,6 +58,40 @@ const usageByWindowAtom = Atom.family((windowKey: string) =>
     return statuses;
   }).pipe(Atom.withLabel(`web-usage:window:${windowKey}`)),
 );
+
+/**
+ * Cost of one thread's provider session.
+ *
+ * Separate from the window query: this prices a single transcript, so it is
+ * cheap enough to sit behind the composer and refresh while a turn runs.
+ */
+const threadCostAtom = Atom.family((key: string) =>
+  Atom.make((get): ThreadUsageCost | null => {
+    const { environmentId, threadId } = JSON.parse(key) as {
+      environmentId: EnvironmentId;
+      threadId: ThreadId;
+    };
+    const result = get(serverEnvironment.threadUsageCost({ environmentId, input: { threadId } }));
+    return Option.getOrNull(AsyncResult.value(result));
+  }).pipe(Atom.withLabel(`web-usage:thread:${key}`)),
+);
+
+/** Stands in for a draft with no thread yet, so the hook stays unconditional. */
+const noThreadCostAtom = Atom.make((): ThreadUsageCost | null => null);
+
+export function useThreadUsageCost(
+  environmentId: EnvironmentId,
+  threadId: ThreadId | null,
+): ThreadUsageCost | null {
+  const atom = useMemo(
+    () =>
+      threadId === null
+        ? noThreadCostAtom
+        : threadCostAtom(JSON.stringify({ environmentId, threadId })),
+    [environmentId, threadId],
+  );
+  return useAtomValue(atom);
+}
 
 export interface UsageView {
   readonly merged: MergedUsage;

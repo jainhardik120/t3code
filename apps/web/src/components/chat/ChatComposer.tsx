@@ -1,6 +1,7 @@
 import type {
   ApprovalRequestId,
   EnvironmentId,
+  ThreadUsageCost,
   ModelSelection,
   PreviewAnnotationPayload,
   ProviderApprovalDecision,
@@ -102,6 +103,7 @@ import {
   renderProviderTraitsPicker,
 } from "./composerProviderState";
 import { ContextWindowMeter } from "./ContextWindowMeter";
+import { useThreadUsageCost } from "../../state/usage";
 import { buildExpandedImagePreview, type ExpandedImagePreview } from "./ExpandedImagePreview";
 import { basenameOfPath } from "../../pierre-icons";
 import { cn, randomUUID } from "~/lib/utils";
@@ -390,6 +392,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   compact: boolean;
   activeContextWindow: ReturnType<typeof deriveLatestContextWindowSnapshot>;
   activeThreadProviderDisplayName: string | null;
+  sessionCost: ThreadUsageCost | null;
   isPreparingWorktree: boolean;
   pendingAction: {
     questionIndex: number;
@@ -417,6 +420,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
         <ContextWindowMeter
           usage={props.activeContextWindow}
           providerDisplayName={props.activeThreadProviderDisplayName}
+          sessionCost={props.sessionCost}
         />
       ) : null}
       {props.isPreparingWorktree ? (
@@ -918,6 +922,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     () => deriveLatestContextWindowSnapshot(activeThreadActivities ?? []),
     [activeThreadActivities],
   );
+  // Priced from the thread's own transcript, so it agrees with the usage page.
+  // Null for a draft, and for any session this server cannot resolve.
+  const sessionCost = useThreadUsageCost(environmentId, activeThreadId);
   const activeThreadProviderDisplayName = useMemo(() => {
     if (!activeThreadModelSelection) return null;
     const entry = providerStatuses.find(
@@ -3186,6 +3193,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   compact={isComposerPrimaryActionsCompact}
                   activeContextWindow={activeContextWindow}
                   activeThreadProviderDisplayName={activeThreadProviderDisplayName}
+                  sessionCost={sessionCost}
                   pendingAction={pendingPrimaryAction}
                   isRunning={phase === "running"}
                   showPlanFollowUpPrompt={pendingUserInputs.length === 0 && showPlanFollowUpPrompt}

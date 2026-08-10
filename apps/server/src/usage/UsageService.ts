@@ -15,6 +15,7 @@ import * as NodeOS from "node:os";
 
 import {
   USAGE_CONTRACT_VERSION,
+  type ThreadUsageCost,
   type UsageProviderKind,
   type UsageSource,
   type UsageSummary,
@@ -89,6 +90,10 @@ export class UsageService extends Context.Service<
   UsageService,
   {
     readonly readSummary: (input: UsageSummaryInput) => Effect.Effect<UsageSummary, UsageReadError>;
+    /** Cost of one provider session, or null when it has no transcript here. */
+    readonly readSessionCost: (
+      sessionId: string,
+    ) => Effect.Effect<ThreadUsageCost | null, UsageReadError>;
   }
 >()("t3/usage/UsageService") {}
 
@@ -115,6 +120,7 @@ export const layerTest = Layer.succeed(
         },
         scanDurationMs: 0,
       }),
+    readSessionCost: () => Effect.succeed(null),
   }),
 );
 
@@ -418,7 +424,69 @@ export const make = Effect.gen(function* () {
     } satisfies UsageSummary;
   });
 
-  return { readSummary } as const;
+  /**
+   * Prices one session, for the cost readout inside a thread.
+   *
+   * Deliberately not `readSummary` filtered down: that walks and parses every
+   * transcript in the window, which is seconds cold. This opens the one file the
+   * session lives in, so it stays cheap enough to sit behind a composer widget.
+   * The aggregator is the same one the usage page uses, over an unbounded
+   * window, so a session's cost here always matches its row there.
+   */
+  const readSessionCost = Effect.fn("UsageService.readSessionCost")(function* (sessionId: string) {
+    if (sessionId.length === 0) return null;
+
+    yield* ensureRates();
+    yield* ensureScanCacheLoaded;
+
+    const dirs = yield* resolveTranscriptDirs().pipe(Effect.provideService(Path.Path, path));
+
+    for (const { provider, dir } of dirs) {
+      const exists = yield* fileSystem
+        .exists(dir)
+        .pipe(Effect.catchCause(() => Effect.succeed(false)));
+      if (!exists) continue;
+
+      // Claude names the file for the session; Codex embeds the id in a
+      // `rollout-<timestamp>-<id>.jsonl` name. A substring match covers both.
+      const files = yield* Effect.promise(() => listTranscriptFiles(dir, 0));
+      const matches = files.filter((file) => path.basename(file.path).includes(sessionId));
+      if (matches.length === 0) continue;
+
+      const aggregator = new UsageAggregator({
+        timeZone: "UTC",
+        sinceDay: "0000-01-01",
+        untilDay: "9999-12-31",
+        rates,
+      });
+
+      for (const file of matches) {
+        const records = yield* readFileRecords(file.path, file.size, file.mtimeMs, provider);
+        for (const record of records) {
+          // A forked Codex rollout carries its ancestors' records too; only the
+          // ones belonging to this session count towards its cost.
+          if (record.sessionId === sessionId) aggregator.add(record);
+        }
+      }
+
+      yield* persistScanCache();
+
+      const session = aggregator.finish().sessions.find((row) => row.sessionId === sessionId);
+      if (session === undefined) continue;
+
+      return {
+        sessionId,
+        totals: session.totals,
+        costUsd: session.costUsd,
+        costSource: session.costSource,
+        records: session.records,
+      } satisfies ThreadUsageCost;
+    }
+
+    return null;
+  });
+
+  return { readSummary, readSessionCost } as const;
 });
 
 export const layer = Layer.effect(UsageService, make);

@@ -1,0 +1,764 @@
+- generic [ref=f1e1]:
+    - generic [ref=f1e3]:
+        - generic [ref=f1e6]:
+            - link "Go to threads" [ref=f1e8] [cursor=pointer]:
+                - /url: /
+                - img "T3" [ref=f1e9]
+                - generic [ref=f1e11]: Code
+            - generic [ref=f1e13]:
+                - generic [ref=f1e14]:
+                    - combobox "Search threads" [ref=f1e20]
+                    - button "New thread" [ref=f1e22] [cursor=pointer]
+                - generic [ref=f1e26]:
+                    - button "Filter threads by project" [ref=f1e27] [cursor=pointer]:
+                        - generic [ref=f1e30]: All projects
+                    - button "New project" [ref=f1e33] [cursor=pointer]
+            - list [ref=f1e39]:
+                - status [ref=f1e40]
+                - listitem [ref=f1e41]:
+                    - button "Home 31m Snooze thread Settle thread Set Up Acer Battery Charging" [ref=f1e42] [cursor=pointer]:
+                        - generic [ref=f1e43]:
+                            - generic [ref=f1e44]:
+                                - generic [ref=f1e47]: Home
+                                - generic [ref=f1e48]:
+                                    - generic: 31m
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e49]: Set Up Acer Battery Charging
+                - listitem [ref=f1e52]:
+                    - button "t3code Snooze thread Settle thread Why T3 Code Uses Repo Node Modules feat/android-fcm-push" [ref=f1e53] [cursor=pointer]:
+                        - generic [ref=f1e54]:
+                            - generic [ref=f1e55]:
+                                - generic [ref=f1e56]: t3code
+                                - generic [ref=f1e57]:
+                                    - generic:
+                                        - generic:
+                                            - status: Working
+                                            - generic: 24m
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e58]: Why T3 Code Uses Repo Node Modules
+                            - generic [ref=f1e60]: feat/android-fcm-push
+                - listitem [ref=f1e62]:
+                    - button "Home 10h Snooze thread Settle thread Troubleshoot GNOME Monitor Extension" [ref=f1e63] [cursor=pointer]:
+                        - generic [ref=f1e64]:
+                            - generic [ref=f1e65]:
+                                - generic [ref=f1e68]: Home
+                                - generic [ref=f1e69]:
+                                    - generic: 10h
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e70]: Troubleshoot GNOME Monitor Extension
+                - listitem [ref=f1e73]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Deploy ESP32 With GPIO Control main" [ref=f1e74] [cursor=pointer]:
+                        - generic [ref=f1e75]:
+                            - generic [ref=f1e76]:
+                                - generic [ref=f1e79]: Helix Kit
+                                - generic [ref=f1e80]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e81]: Deploy ESP32 With GPIO Control
+                            - generic [ref=f1e83]: main
+                - listitem [ref=f1e85]:
+                    - button "Helix Kit 1d Snooze thread Settle thread Implement PDF Reporting Package main" [ref=f1e86] [cursor=pointer]:
+                        - generic [ref=f1e87]:
+                            - generic [ref=f1e88]:
+                                - generic [ref=f1e91]: Helix Kit
+                                - generic [ref=f1e92]:
+                                    - generic: 1d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e93]: Implement PDF Reporting Package
+                            - generic [ref=f1e95]: main
+                - listitem [ref=f1e97]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Radxa Board NPU Precision Support main" [ref=f1e98] [cursor=pointer]:
+                        - generic [ref=f1e99]:
+                            - generic [ref=f1e100]:
+                                - generic [ref=f1e103]: Helix Kit
+                                - generic [ref=f1e104]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e105]: Radxa Board NPU Precision Support
+                            - generic [ref=f1e107]: main
+                - listitem [ref=f1e109]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Define Embedded Hardware Intelligence Platform main" [ref=f1e110] [cursor=pointer]:
+                        - generic [ref=f1e111]:
+                            - generic [ref=f1e112]:
+                                - generic [ref=f1e115]: Helix Kit
+                                - generic [ref=f1e116]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e117]: Define Embedded Hardware Intelligence Platform
+                            - generic [ref=f1e119]: main
+                - listitem [ref=f1e121]:
+                    - button "TrakrAI Snooze thread Settle thread Add Teams Chat SDK Notification Channel main" [ref=f1e122] [cursor=pointer]:
+                        - generic [ref=f1e123]:
+                            - generic [ref=f1e124]:
+                                - generic [ref=f1e127]: TrakrAI
+                                - generic [ref=f1e128]:
+                                    - generic:
+                                        - generic:
+                                            - status: Working
+                                            - generic: 43m
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e129]: Add Teams Chat SDK Notification Channel
+                            - generic [ref=f1e131]: main
+                - listitem [ref=f1e133]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Plan Sitewide AI Agent and MCP main" [ref=f1e134] [cursor=pointer]:
+                        - generic [ref=f1e135]:
+                            - generic [ref=f1e136]:
+                                - generic [ref=f1e139]: Helix Kit
+                                - generic [ref=f1e140]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e141]: Plan Sitewide AI Agent and MCP
+                            - generic [ref=f1e143]: main
+                - listitem [ref=f1e145]:
+                    - button "TrakrAI 2d Snooze thread Settle thread Canlogger Summary Report Workflow main" [ref=f1e146] [cursor=pointer]:
+                        - generic [ref=f1e147]:
+                            - generic [ref=f1e148]:
+                                - generic [ref=f1e151]: TrakrAI
+                                - generic [ref=f1e152]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e153]: Canlogger Summary Report Workflow
+                            - generic [ref=f1e155]: main
+                - listitem [ref=f1e157]:
+                    - button "Settled" [expanded] [ref=f1e158] [cursor=pointer]
+                - listitem [ref=f1e163]:
+                    - button "Teams Bot Prototype in Experimental 13m Un-settle thread" [ref=f1e164] [cursor=pointer]:
+                        - generic [ref=f1e168]: Teams Bot Prototype in Experimental
+                        - generic [ref=f1e169]:
+                            - generic [ref=f1e170]: 13m
+                            - button "Un-settle thread"
+                - listitem [ref=f1e172]:
+                    - button "Test ESP32 nRF24L01 Connection 7d Un-settle thread" [ref=f1e173] [cursor=pointer]:
+                        - generic [ref=f1e177]: Test ESP32 nRF24L01 Connection
+                        - generic [ref=f1e178]:
+                            - generic [ref=f1e179]: 7d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e181]:
+                    - button "Warp SSH stale process startup 7d Un-settle thread" [ref=f1e182] [cursor=pointer]:
+                        - generic [ref=f1e186]: Warp SSH stale process startup
+                        - generic [ref=f1e187]:
+                            - generic [ref=f1e188]: 7d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e190]:
+                    - button "Benchmark USB Drives for Development 7d Un-settle thread" [ref=f1e191] [cursor=pointer]:
+                        - generic [ref=f1e195]: Benchmark USB Drives for Development
+                        - generic [ref=f1e196]:
+                            - generic [ref=f1e197]: 7d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e199]:
+                    - button "Polish Blog Navigation and Sharing 8d Un-settle thread" [ref=f1e200] [cursor=pointer]:
+                        - generic [ref=f1e204]: Polish Blog Navigation and Sharing
+                        - generic [ref=f1e205]:
+                            - generic [ref=f1e206]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e208]:
+                    - button "Fetch Published Helix Blog Posts 8d Un-settle thread" [ref=f1e209] [cursor=pointer]:
+                        - generic [ref=f1e213]: Fetch Published Helix Blog Posts
+                        - generic [ref=f1e214]:
+                            - generic [ref=f1e215]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e217]:
+                    - button "Clean Up Worktrees and Branches 8d Un-settle thread" [ref=f1e218] [cursor=pointer]:
+                        - generic [ref=f1e222]: Clean Up Worktrees and Branches
+                        - generic [ref=f1e223]:
+                            - generic [ref=f1e224]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e226]:
+                    - button "Create Helix-163 Worktree and Tunnel Dev Server 8d Un-settle thread" [ref=f1e227] [cursor=pointer]:
+                        - generic [ref=f1e231]: Create Helix-163 Worktree and Tunnel Dev Server
+                        - generic [ref=f1e232]:
+                            - generic [ref=f1e233]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e235]:
+                    - button "Restore Radxa LLM Experiment Files 8d Un-settle thread" [ref=f1e236] [cursor=pointer]:
+                        - generic [ref=f1e240]: Restore Radxa LLM Experiment Files
+                        - generic [ref=f1e241]:
+                            - generic [ref=f1e242]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e244]:
+                    - button "Automate STM32 Flashing via ESP32 9d Un-settle thread" [ref=f1e245] [cursor=pointer]:
+                        - generic [ref=f1e249]: Automate STM32 Flashing via ESP32
+                        - generic [ref=f1e250]:
+                            - generic [ref=f1e251]: 9d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e253]:
+                    - button "Show 25 more" [ref=f1e254] [cursor=pointer]
+            - list [ref=f1e257]:
+                - listitem [ref=f1e258]:
+                    - button "Usage" [ref=f1e259] [cursor=pointer]
+                - listitem [ref=f1e262]:
+                    - button "Settings" [ref=f1e263] [cursor=pointer]
+            - button "Resize Sidebar" [ref=f1e268]
+        - main [ref=f1e269]:
+            - generic [ref=f1e270]:
+                - navigation "Usage breadcrumb" [ref=f1e272]:
+                    - list [ref=f1e273]:
+                        - listitem [ref=f1e274]: Usage
+                - generic [ref=f1e276]:
+                    - generic [ref=f1e277]:
+                        - paragraph [ref=f1e278]: Jul 12 to Aug 10
+                        - generic [ref=f1e279]:
+                            - generic [ref=f1e280]:
+                                - button "7 days" [ref=f1e281] [cursor=pointer]
+                                - button "30 days" [ref=f1e282] [cursor=pointer]
+                                - button "90 days" [ref=f1e283] [cursor=pointer]
+                            - button "Refresh usage" [ref=f1e284] [cursor=pointer]
+                    - generic [ref=f1e290]:
+                        - generic [ref=f1e291]:
+                            - generic [ref=f1e292]:
+                                - generic [ref=f1e293]: Raw token cost
+                                - generic [ref=f1e294]: $4,906.44*
+                                - generic [ref=f1e295]: "* if billed at full API rate"
+                            - generic [ref=f1e296]:
+                                - generic [ref=f1e297]:
+                                    - generic [ref=f1e298]: Claude Code
+                                    - generic [ref=f1e301]: $4,903.80
+                                - generic [ref=f1e304]: 99.9% of cost · 7.32B tokens
+                            - generic [ref=f1e305]:
+                                - generic [ref=f1e306]:
+                                    - generic [ref=f1e307]: Codex
+                                    - generic [ref=f1e310]: $2.64
+                                - generic [ref=f1e313]: 0.1% of cost · 2.27M tokens
+                        - generic [ref=f1e314]:
+                            - generic [ref=f1e315]:
+                                - heading "Daily cost" [level=2] [ref=f1e316]
+                                - generic [ref=f1e317]:
+                                    - generic [ref=f1e318]:
+                                        - button "cost" [ref=f1e319] [cursor=pointer]
+                                        - button "tokens" [ref=f1e320] [cursor=pointer]
+                                    - generic [ref=f1e321]:
+                                        - generic [ref=f1e322]: Codex
+                                        - generic [ref=f1e325]: Claude Code
+                            - generic [ref=f1e328]:
+                                - generic [ref=f1e329]:
+                                    - generic [ref=f1e330]:
+                                        - generic [ref=f1e331]: "0"
+                                        - generic [ref=f1e332]: $200.00
+                                        - generic [ref=f1e333]: $400.00
+                                        - generic [ref=f1e334]: $600.00
+                                    - img "Daily cost by provider" [ref=f1e336]
+                                - generic [ref=f1e341]:
+                                    - generic [ref=f1e342]: Jul 12
+                                    - generic [ref=f1e343]: Jul 27
+                                    - generic [ref=f1e344]: Aug 10
+                    - generic [ref=f1e345]:
+                        - generic [ref=f1e346]:
+                            - generic [ref=f1e347]: Processed tokens
+                            - generic [ref=f1e348]: 7.32B
+                            - generic [ref=f1e349]: 253M per active day
+                        - generic [ref=f1e350]:
+                            - generic [ref=f1e351]: Cached input
+                            - generic [ref=f1e352]: 7.16B
+                            - generic [ref=f1e353]: 100.0% of observed input
+                        - generic [ref=f1e354]:
+                            - generic [ref=f1e355]: Uncached input
+                            - generic [ref=f1e356]: 568K
+                            - generic [ref=f1e357]: 144M cache writes
+                        - generic [ref=f1e358]:
+                            - generic [ref=f1e359]: Output
+                            - generic [ref=f1e360]: 17M
+                            - generic [ref=f1e361]: includes 3.01K reasoning
+                        - generic [ref=f1e362]:
+                            - generic [ref=f1e363]: Cache savings
+                            - generic [ref=f1e364]: $32,205.71
+                            - generic [ref=f1e365]: 6.6x the raw token cost
+                    - generic [ref=f1e366]:
+                        - generic [ref=f1e367]:
+                            - heading "Breakdown" [level=2] [ref=f1e368]
+                            - generic [ref=f1e369]:
+                                - button "model" [ref=f1e370] [cursor=pointer]
+                                - button "day" [ref=f1e371] [cursor=pointer]
+                                - button "project" [ref=f1e372] [cursor=pointer]
+                                - button "session" [active] [ref=f1e373] [cursor=pointer]
+                        - generic [ref=f1e374]:
+                            - table [ref=f1e375]:
+                                - rowgroup [ref=f1e382]:
+                                    - row [ref=f1e383]:
+                                        - columnheader "Session" [ref=f1e384]
+                                        - columnheader "Project" [ref=f1e385]
+                                        - columnheader "Cost" [ref=f1e386]
+                                        - columnheader "Tokens" [ref=f1e387]
+                                        - columnheader "Last active" [ref=f1e388]
+                                - rowgroup [ref=f1e389]:
+                                    - row [ref=f1e390]:
+                                        - cell [ref=f1e391]:
+                                            - link "Canlogger Summary Report Workflow" [ref=f1e395] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/f816cc98-b199-492d-a026-1df14bbe7370
+                                        - cell "hacklab/trakrai" [ref=f1e401]:
+                                            - generic "/home/jainhardik120/code/hacklab/trakrai" [ref=f1e402]: hacklab/trakrai
+                                        - cell "$658.11" [ref=f1e403]
+                                        - cell "1.01B" [ref=f1e404]
+                                        - cell "Aug 8" [ref=f1e405]
+                                    - row [ref=f1e406]:
+                                        - cell [ref=f1e407]:
+                                            - link "Run React Kiosk Without KDE" [ref=f1e411] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/84413b43-ce7c-4b85-904d-64425680c1e7
+                                        - cell "code/helix" [ref=f1e417]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e418]: code/helix
+                                        - cell "$635.79" [ref=f1e419]
+                                        - cell "986M" [ref=f1e420]
+                                        - cell "Jul 30" [ref=f1e421]
+                                    - row [ref=f1e422]:
+                                        - cell [ref=f1e423]:
+                                            - link "Experimental Helix port forwarding" [ref=f1e427] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/e2fd85a3-f113-46af-bcd1-552dc76dfe62
+                                        - cell "code/helix" [ref=f1e433]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e434]: code/helix
+                                        - cell "$531.70" [ref=f1e435]
+                                        - cell "813M" [ref=f1e436]
+                                        - cell "Jul 15" [ref=f1e437]
+                                    - row [ref=f1e438]:
+                                        - cell [ref=f1e439]:
+                                            - link "Download Cubie A7Z image" [ref=f1e443] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/c269af79-800a-4afc-acf1-304f1f91ba15
+                                        - cell "code/helix" [ref=f1e449]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e450]: code/helix
+                                        - cell "$512.13" [ref=f1e451]
+                                        - cell "745M" [ref=f1e452]
+                                        - cell "Jul 30" [ref=f1e453]
+                                    - row [ref=f1e454]:
+                                        - cell [ref=f1e455]:
+                                            - link "Implement PDF Reporting Package" [ref=f1e459] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/fda82217-eeb8-4524-b9cf-d530c4c760c5
+                                        - cell "code/helix" [ref=f1e465]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e466]: code/helix
+                                        - cell "$421.60" [ref=f1e467]
+                                        - cell "667M" [ref=f1e468]
+                                        - cell "Aug 9" [ref=f1e469]
+                                    - row [ref=f1e470]:
+                                        - cell [ref=f1e471]:
+                                            - link "Define Embedded Hardware Intelligence Platform" [ref=f1e475] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/eabb5e85-033c-4430-854e-4cd137fcbf40
+                                        - cell "code/helix" [ref=f1e481]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e482]: code/helix
+                                        - cell "$294.86" [ref=f1e483]
+                                        - cell "419M" [ref=f1e484]
+                                        - cell "Aug 8" [ref=f1e485]
+                                    - row [ref=f1e486]:
+                                        - cell [ref=f1e487]:
+                                            - link "Plan Sitewide AI Agent and MCP" [ref=f1e491] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/8f2cca2a-92d0-4491-b2a3-cf51f02283b0
+                                        - cell "code/helix" [ref=f1e497]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e498]: code/helix
+                                        - cell "$279.15" [ref=f1e499]
+                                        - cell "387M" [ref=f1e500]
+                                        - cell "Aug 8" [ref=f1e501]
+                                    - row [ref=f1e502]:
+                                        - cell [ref=f1e503]:
+                                            - link "Build Android Client for T3 Code" [ref=f1e507] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/4ef518fc-af55-4d65-b978-e8bd203518ef
+                                        - cell "code/t3code" [ref=f1e513]:
+                                            - generic "/home/jainhardik120/code/t3code" [ref=f1e514]: code/t3code
+                                        - cell "$230.08" [ref=f1e515]
+                                        - cell "336M" [ref=f1e516]
+                                        - cell "Jul 31" [ref=f1e517]
+                                    - row [ref=f1e518]:
+                                        - cell [ref=f1e519]:
+                                            - link "Add Teams Chat SDK Notification Channel" [ref=f1e523] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/3146b765-ec70-4259-8f56-59988c78812e
+                                        - cell "hacklab/trakrai" [ref=f1e529]:
+                                            - generic "/home/jainhardik120/code/hacklab/trakrai" [ref=f1e530]: hacklab/trakrai
+                                        - cell "$218.94" [ref=f1e531]
+                                        - cell "363M" [ref=f1e532]
+                                        - cell "Aug 10" [ref=f1e533]
+                                    - row [ref=f1e534]:
+                                        - cell [ref=f1e535]:
+                                            - link "Run Helix Website Against EC2" [ref=f1e539] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/3f004031-63a8-46fb-9e59-dd8be7e3b66e
+                                        - cell "code/helix" [ref=f1e545]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e546]: code/helix
+                                        - cell "$195.38" [ref=f1e547]
+                                        - cell "298M" [ref=f1e548]
+                                        - cell "Jul 29" [ref=f1e549]
+                                    - row [ref=f1e550]:
+                                        - cell [ref=f1e551]:
+                                            - link "Check Linear MCP Access" [ref=f1e555] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/f29b5148-188a-43e8-98ef-803eb6ce19d7
+                                        - cell "code/helix" [ref=f1e561]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e562]: code/helix
+                                        - cell "$126.62" [ref=f1e563]
+                                        - cell "127M" [ref=f1e564]
+                                        - cell "Jul 29" [ref=f1e565]
+                                    - row [ref=f1e566]:
+                                        - cell [ref=f1e567]:
+                                            - link "Port Linux Services and Config Management" [ref=f1e571] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/dc959557-c7f7-4cea-949d-762df3aa2233
+                                        - cell "code/helix" [ref=f1e577]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e578]: code/helix
+                                        - cell "$110.51" [ref=f1e579]
+                                        - cell "179M" [ref=f1e580]
+                                        - cell "Jul 28" [ref=f1e581]
+                                    - row [ref=f1e582]:
+                                        - cell [ref=f1e583]:
+                                            - link "Bring Up Radxa Helixd and Next.js" [ref=f1e587] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/766d63a4-86ae-481c-b179-4535f5c17200
+                                        - cell "code/helix" [ref=f1e593]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e594]: code/helix
+                                        - cell "$72.91" [ref=f1e595]
+                                        - cell "126M" [ref=f1e596]
+                                        - cell "Aug 1" [ref=f1e597]
+                                    - row [ref=f1e598]:
+                                        - cell [ref=f1e599]:
+                                            - link "EC2 appliance load test feasibility" [ref=f1e603] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/c2ab81c5-8589-412a-b06c-58ea9202e08d
+                                        - cell "code/helix" [ref=f1e609]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e610]: code/helix
+                                        - cell "$66.00" [ref=f1e611]
+                                        - cell "103M" [ref=f1e612]
+                                        - cell "Jul 12" [ref=f1e613]
+                                    - row [ref=f1e614]:
+                                        - cell [ref=f1e615]:
+                                            - link "Appliance update rollback workflow" [ref=f1e619] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/cfa67022-8e45-4bc1-a791-50e0ca2425c9
+                                        - cell "hacklab/trakrai" [ref=f1e625]:
+                                            - generic "/home/jainhardik120/code/hacklab/trakrai" [ref=f1e626]: hacklab/trakrai
+                                        - cell "$62.24" [ref=f1e627]
+                                        - cell "90.7M" [ref=f1e628]
+                                        - cell "Jul 15" [ref=f1e629]
+                                    - row [ref=f1e630]:
+                                        - cell [ref=f1e631]:
+                                            - link "Why T3 Code Uses Repo Node Modules" [ref=f1e635] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/5e8f6cd2-9bc2-4f4b-962d-252c8d82df83
+                                        - cell "code/t3code" [ref=f1e641]:
+                                            - generic "/home/jainhardik120/code/t3code" [ref=f1e642]: code/t3code
+                                        - cell "$49.50" [ref=f1e643]
+                                        - cell "78.3M" [ref=f1e644]
+                                        - cell "Aug 10" [ref=f1e645]
+                                    - row [ref=f1e646]:
+                                        - cell [ref=f1e647]:
+                                            - link "Create Helix-163 Worktree and Tunnel Dev Server" [ref=f1e651] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/8f8b2b6e-0a8c-42fc-a0ff-54d5e81f6d46
+                                        - cell "code/helix" [ref=f1e657]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e658]: code/helix
+                                        - cell "$38.13" [ref=f1e659]
+                                        - cell "58.3M" [ref=f1e660]
+                                        - cell "Aug 2" [ref=f1e661]
+                                    - row [ref=f1e662]:
+                                        - cell [ref=f1e663]:
+                                            - link "Fix Failing Web Builds" [ref=f1e667] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/40efbe0a-cb60-428d-8bf3-844c83b0d39e
+                                        - cell "code/helix" [ref=f1e673]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e674]: code/helix
+                                        - cell "$35.31" [ref=f1e675]
+                                        - cell "51.7M" [ref=f1e676]
+                                        - cell "Jul 29" [ref=f1e677]
+                                    - row [ref=f1e678]:
+                                        - cell [ref=f1e679]:
+                                            - link "Seed rich technical blog posts" [ref=f1e683] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/195aa516-4108-459a-be99-086c17aa63fc
+                                        - cell "core/helix-backend" [ref=f1e689]:
+                                            - generic "/home/jainhardik120/code/helix/web/packages/core/helix-backend" [ref=f1e690]: core/helix-backend
+                                        - cell "$33.38" [ref=f1e691]
+                                        - cell "38.3M" [ref=f1e692]
+                                        - cell "Jul 16" [ref=f1e693]
+                                    - row [ref=f1e694]:
+                                        - cell [ref=f1e695]:
+                                            - link "Custom ESP32 firmware builder status" [ref=f1e699] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/ab3d0483-c266-4060-a2f2-1e1fa59f2968
+                                        - cell "code/helix" [ref=f1e705]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e706]: code/helix
+                                        - cell "$28.41" [ref=f1e707]
+                                        - cell "42.1M" [ref=f1e708]
+                                        - cell "Jul 16" [ref=f1e709]
+                                    - row [ref=f1e710]:
+                                        - cell [ref=f1e711]:
+                                            - link "LVGL ESP32 QEMU UI scaffold" [ref=f1e715] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/6eb9820c-be2d-43c1-bbf5-90642af63286
+                                        - cell "code/helix" [ref=f1e721]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e722]: code/helix
+                                        - cell "$26.28" [ref=f1e723]
+                                        - cell "41.3M" [ref=f1e724]
+                                        - cell "Jul 14" [ref=f1e725]
+                                    - row [ref=f1e726]:
+                                        - cell [ref=f1e727]:
+                                            - link "Deploy ESP32 With GPIO Control" [ref=f1e731] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/548baf84-9f1f-4abe-a5bf-03e0bcdc855c
+                                        - cell "code/helix" [ref=f1e737]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e738]: code/helix
+                                        - cell "$25.41" [ref=f1e739]
+                                        - cell "42.1M" [ref=f1e740]
+                                        - cell "Aug 8" [ref=f1e741]
+                                    - row [ref=f1e742]:
+                                        - cell [ref=f1e743]:
+                                            - link "What I want us to do is, design a claude subagent,..." [ref=f1e747] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/e8d333ac-19ca-424f-92e5-462616882769
+                                        - cell "code/helix" [ref=f1e753]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e754]: code/helix
+                                        - cell "$24.37" [ref=f1e755]
+                                        - cell "31.7M" [ref=f1e756]
+                                        - cell "Jul 30" [ref=f1e757]
+                                    - row [ref=f1e758]:
+                                        - cell [ref=f1e759]:
+                                            - link "ESP32 USB Helix and Android USB" [ref=f1e763] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/56339091-b78a-44ac-9124-a6a9188bed8c
+                                        - cell "code/helix" [ref=f1e769]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e770]: code/helix
+                                        - cell "$24.32" [ref=f1e771]
+                                        - cell "35M" [ref=f1e772]
+                                        - cell "Jul 16" [ref=f1e773]
+                                    - row [ref=f1e774]:
+                                        - cell [ref=f1e775]:
+                                            - link "Analyze SD Card for ESP32 Use" [ref=f1e779] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/b2a930c1-4c0e-4263-8f4b-4ac276e736f8
+                                        - cell "code/helix" [ref=f1e785]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e786]: code/helix
+                                        - cell "$21.54" [ref=f1e787]
+                                        - cell "28.7M" [ref=f1e788]
+                                        - cell "Jul 28" [ref=f1e789]
+                                    - row [ref=f1e790]:
+                                        - cell [ref=f1e791]:
+                                            - link "Test ESP32 nRF24L01 Connection" [ref=f1e795] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/bd8f2225-dec8-4bdd-aea0-329486ffa552
+                                        - cell "code/helix" [ref=f1e801]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e802]: code/helix
+                                        - cell "$19.27" [ref=f1e803]
+                                        - cell "23.9M" [ref=f1e804]
+                                        - cell "Aug 3" [ref=f1e805]
+                                    - row [ref=f1e806]:
+                                        - cell [ref=f1e807]:
+                                            - link "Restore Radxa LLM Experiment Files" [ref=f1e811] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/c09fab7b-edab-4028-9352-dcb659b2c3a5
+                                        - cell "code/helix" [ref=f1e817]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e818]: code/helix
+                                        - cell "$19.13" [ref=f1e819]
+                                        - cell "25.4M" [ref=f1e820]
+                                        - cell "Aug 2" [ref=f1e821]
+                                    - row [ref=f1e822]:
+                                        - cell [ref=f1e823]:
+                                            - link "Radxa Board NPU Precision Support" [ref=f1e827] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/7d7d94f4-831d-47db-b31b-34fa8fcfbef0
+                                        - cell "code/helix" [ref=f1e833]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e834]: code/helix
+                                        - cell "$15.27" [ref=f1e835]
+                                        - cell "18.3M" [ref=f1e836]
+                                        - cell "Aug 7" [ref=f1e837]
+                                    - row [ref=f1e838]:
+                                        - cell [ref=f1e839]:
+                                            - link "Fetch Published Helix Blog Posts" [ref=f1e843] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/3f61392d-ea9d-44e9-83a8-ac055d318c01
+                                        - cell "code/helix" [ref=f1e849]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e850]: code/helix
+                                        - cell "$13.82" [ref=f1e851]
+                                        - cell "16.5M" [ref=f1e852]
+                                        - cell "Aug 2" [ref=f1e853]
+                                    - row [ref=f1e854]:
+                                        - cell [ref=f1e855]:
+                                            - link "Minimal EC2 AMI for Redpanda" [ref=f1e859] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/9d4590d7-1335-4ce5-82c6-3c85523bff96
+                                        - cell "code/helix" [ref=f1e865]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e866]: code/helix
+                                        - cell "$12.09" [ref=f1e867]
+                                        - cell "16M" [ref=f1e868]
+                                        - cell "Jul 12" [ref=f1e869]
+                                    - row [ref=f1e870]:
+                                        - cell [ref=f1e871]:
+                                            - link "Teams Bot Prototype in Experimental" [ref=f1e875] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/6b44c89a-cb57-4ef9-8612-0ae991bdeefa
+                                        - cell "code/helix" [ref=f1e881]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e882]: code/helix
+                                        - cell "$10.90" [ref=f1e883]
+                                        - cell "14.9M" [ref=f1e884]
+                                        - cell "Jul 12" [ref=f1e885]
+                                    - row [ref=f1e886]:
+                                        - cell [ref=f1e887]:
+                                            - link "Benchmark USB Drives for Development" [ref=f1e891] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/239fa488-b0dc-4b46-b043-ba56547dcf58
+                                        - cell "home/jainhardik120" [ref=f1e897]:
+                                            - generic "/home/jainhardik120" [ref=f1e898]: home/jainhardik120
+                                        - cell "$10.40" [ref=f1e899]
+                                        - cell "11.3M" [ref=f1e900]
+                                        - cell "Aug 3" [ref=f1e901]
+                                    - row [ref=f1e902]:
+                                        - cell [ref=f1e903]:
+                                            - link "Polish Blog Navigation and Sharing" [ref=f1e907] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/98f86320-7016-48ee-b687-fb9865aab856
+                                        - cell "code/helix" [ref=f1e913]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e914]: code/helix
+                                        - cell "$10.38" [ref=f1e915]
+                                        - cell "16.1M" [ref=f1e916]
+                                        - cell "Aug 2" [ref=f1e917]
+                                    - row [ref=f1e918]:
+                                        - cell [ref=f1e919]:
+                                            - link "HELIX-151 had 2 issues, where the default CTA won;..." [ref=f1e923] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/245a17d5-0864-4a22-840a-415dd07eb5fa
+                                        - cell "code/helix" [ref=f1e929]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e930]: code/helix
+                                        - cell "$10.02" [ref=f1e931]
+                                        - cell "15.1M" [ref=f1e932]
+                                        - cell "Jul 30" [ref=f1e933]
+                                    - row [ref=f1e934]:
+                                        - cell [ref=f1e935]:
+                                            - link "Build Android Monitor Camera Utility" [ref=f1e939] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/724d62a6-7885-4134-aff5-aa57e7e33bed
+                                        - cell "code/helix" [ref=f1e945]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e946]: code/helix
+                                        - cell "$9.18" [ref=f1e947]
+                                        - cell "11.9M" [ref=f1e948]
+                                        - cell "Jul 25" [ref=f1e949]
+                                    - row [ref=f1e950]:
+                                        - cell [ref=f1e951]:
+                                            - link "Clean Up Worktrees and Branches" [ref=f1e955] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/3395f8ca-9171-4bad-bb65-263531433458
+                                        - cell "code/helix" [ref=f1e961]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e962]: code/helix
+                                        - cell "$9.17" [ref=f1e963]
+                                        - cell "13.2M" [ref=f1e964]
+                                        - cell "Aug 2" [ref=f1e965]
+                                    - row [ref=f1e966]:
+                                        - cell [ref=f1e967]:
+                                            - link "Automate STM32 Flashing via ESP32" [ref=f1e971] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/6749110c-2665-48c1-b269-997801d9aeab
+                                        - cell "code/helix" [ref=f1e977]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e978]: code/helix
+                                        - cell "$9.10" [ref=f1e979]
+                                        - cell "11.9M" [ref=f1e980]
+                                        - cell "Aug 1" [ref=f1e981]
+                                    - row [ref=f1e982]:
+                                        - cell [ref=f1e983]:
+                                            - link "Fix Helix theme switching" [ref=f1e987] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/ed0e84d6-5dcf-4acb-be3e-d1fc2002b5d7
+                                        - cell "code/helix" [ref=f1e993]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e994]: code/helix
+                                        - cell "$6.17" [ref=f1e995]
+                                        - cell "7.90M" [ref=f1e996]
+                                        - cell "Jul 15" [ref=f1e997]
+                                    - row [ref=f1e998]:
+                                        - cell [ref=f1e999]:
+                                            - link "Investigate crash reboot history" [ref=f1e1003] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/4333c98d-3c29-4037-8fcd-02208063c1fc
+                                        - cell "home/jainhardik120" [ref=f1e1009]:
+                                            - generic "/home/jainhardik120" [ref=f1e1010]: home/jainhardik120
+                                        - cell "$4.96" [ref=f1e1011]
+                                        - cell "4.28M" [ref=f1e1012]
+                                        - cell "Jul 20" [ref=f1e1013]
+                                    - row [ref=f1e1014]:
+                                        - cell [ref=f1e1015]:
+                                            - link "Add Tilt Accuracy Dashboard Charts" [ref=f1e1019] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/0d1f6dfd-c50b-48e2-827f-743b94cdb66e
+                                        - cell "hacklab/trakrboard-frontend" [ref=f1e1025]:
+                                            - generic "/home/jainhardik120/code/hacklab/trakrboard-frontend" [ref=f1e1026]: hacklab/trakrboard-frontend
+                                        - cell "$3.61" [ref=f1e1027]
+                                        - cell "3.88M" [ref=f1e1028]
+                                        - cell "Jul 30" [ref=f1e1029]
+                                    - row [ref=f1e1030]:
+                                        - cell [ref=f1e1031]:
+                                            - link "Enterprise VPN Architecture Basics" [ref=f1e1035] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/7edd4e2f-b9e0-406e-9e50-20bcdf9631a5
+                                        - cell "hacklab/enterpriseVPN" [ref=f1e1041]:
+                                            - generic "/home/jainhardik120/code/hacklab/enterpriseVPN" [ref=f1e1042]: hacklab/enterpriseVPN
+                                        - cell "$3.48" [ref=f1e1043]
+                                        - cell "2.20M" [ref=f1e1044]
+                                        - cell "Jul 16" [ref=f1e1045]
+                                    - row [ref=f1e1046]:
+                                        - cell [ref=f1e1047]:
+                                            - link "Audit Disk Usage and Docker Cleanup" [ref=f1e1051] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/a174e9c0-fb9b-4a55-8d53-32b1c53a23be
+                                        - cell "code/helix" [ref=f1e1057]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e1058]: code/helix
+                                        - cell "$2.55" [ref=f1e1059]
+                                        - cell "2.24M" [ref=f1e1060]
+                                        - cell "Jul 31" [ref=f1e1061]
+                                    - row [ref=f1e1062]:
+                                        - cell [ref=f1e1063]:
+                                            - link "Warp SSH stale process startup" [ref=f1e1067] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/5ee3f313-eef0-491f-84aa-9483319d3342
+                                        - cell "home/jainhardik120" [ref=f1e1073]:
+                                            - generic "/home/jainhardik120" [ref=f1e1074]: home/jainhardik120
+                                        - cell "$1.63" [ref=f1e1075]
+                                        - cell "980K" [ref=f1e1076]
+                                        - cell "Aug 3" [ref=f1e1077]
+                                    - row [ref=f1e1078]:
+                                        - cell [ref=f1e1079]:
+                                            - link "Build Full-Search Othello Probability Finder" [ref=f1e1083] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/d6f478f5-9245-479e-a66a-5b65b54297d1
+                                        - cell "home/jainhardik120" [ref=f1e1089]:
+                                            - generic "/home/jainhardik120" [ref=f1e1090]: home/jainhardik120
+                                        - cell "$1.55" [ref=f1e1091]
+                                        - cell "1.24M" [ref=f1e1092]
+                                        - cell "Jul 29" [ref=f1e1093]
+                                    - row [ref=f1e1094]:
+                                        - cell [ref=f1e1095]:
+                                            - link "commit and push ongoing work in main branch for HE..." [ref=f1e1099] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/83695209-2896-43e0-9a3a-672e7ae68f72
+                                        - cell "code/helix" [ref=f1e1105]:
+                                            - generic "/home/jainhardik120/code/helix" [ref=f1e1106]: code/helix
+                                        - cell "$1.48" [ref=f1e1107]
+                                        - cell "1.57M" [ref=f1e1108]
+                                        - cell "Jul 30" [ref=f1e1109]
+                                    - row [ref=f1e1110]:
+                                        - cell "f8401060" [ref=f1e1111]:
+                                            - generic "f8401060-85ac-4633-986b-693f7e64f02d claude-opus-5" [ref=f1e1115]: f8401060
+                                        - cell "code/DevBench" [ref=f1e1117]:
+                                            - generic "/home/jainhardik120/code/DevBench" [ref=f1e1118]: code/DevBench
+                                        - cell "$1.24" [ref=f1e1119]
+                                        - cell "1.43M" [ref=f1e1120]
+                                        - cell "Aug 5" [ref=f1e1121]
+                                    - row [ref=f1e1122]:
+                                        - cell "019f79d2" [ref=f1e1123]:
+                                            - generic "019f79d2-1cc6-75b0-abcb-9cacf3305d1d gpt-5.5" [ref=f1e1127]: 019f79d2
+                                        - cell "Downloads/reports" [ref=f1e1129]:
+                                            - generic "/home/jainhardik120/Downloads/reports" [ref=f1e1130]: Downloads/reports
+                                        - cell "$1.24" [ref=f1e1131]
+                                        - cell "992K" [ref=f1e1132]
+                                        - cell "Jul 19" [ref=f1e1133]
+                                    - row [ref=f1e1134]:
+                                        - cell "e25247ae" [ref=f1e1135]:
+                                            - generic "e25247ae-ac48-49ec-afca-446bae25f482 claude-opus-5" [ref=f1e1139]: e25247ae
+                                        - cell "code/t3code" [ref=f1e1141]:
+                                            - generic "/home/jainhardik120/code/t3code" [ref=f1e1142]: code/t3code
+                                        - cell "$1.22" [ref=f1e1143]
+                                        - cell "1.28M" [ref=f1e1144]
+                                        - cell "Jul 31" [ref=f1e1145]
+                                    - row [ref=f1e1146]:
+                                        - cell "019f2c0d" [ref=f1e1147]:
+                                            - generic "019f2c0d-f1ea-7443-90d1-665b427a6d14 gpt-5.5" [ref=f1e1151]: 019f2c0d
+                                        - cell "code/t3code" [ref=f1e1153]:
+                                            - generic "/home/jainhardik120/code/t3code" [ref=f1e1154]: code/t3code
+                                        - cell "$1.20" [ref=f1e1155]
+                                        - cell "977K" [ref=f1e1156]
+                                        - cell "Jul 24" [ref=f1e1157]
+                                    - row [ref=f1e1158]:
+                                        - cell [ref=f1e1159]:
+                                            - link "Set Up Acer Battery Charging" [ref=f1e1163] [cursor=pointer]:
+                                                - /url: /bf6b5ac9-b35b-4239-ba6f-9381219d9715/6edd2f5f-06c5-469e-8c3e-930f88262451
+                                        - cell "home/jainhardik120" [ref=f1e1169]:
+                                            - generic "/home/jainhardik120" [ref=f1e1170]: home/jainhardik120
+                                        - cell "$1.18" [ref=f1e1171]
+                                        - cell "1.11M" [ref=f1e1172]
+                                        - cell "Aug 10" [ref=f1e1173]
+                            - paragraph [ref=f1e1174]: Showing the 50 costliest of 62 sessions.
+        - button "Toggle main sidebar" [pressed] [ref=f1e1175] [cursor=pointer]:
+            - generic [ref=f1e1176]: Toggle Sidebar
+    - generic:
+        - region "Notifications"
+    - generic:
+        - region "Notifications":
+            - dialog [ref=f1e1177]:
+                - button "Dismiss notification" [ref=f1e1179] [cursor=pointer]
+                - generic [ref=f1e1183]:
+                    - generic [ref=f1e1186]:
+                        - 'heading "Updates Available: 2 providers" [level=2] [ref=f1e1187]'
+                        - paragraph [ref=f1e1188]: Install the update now or review provider settings.
+                    - generic [ref=f1e1189]:
+                        - button "Settings" [ref=f1e1190] [cursor=pointer]
+                        - button "Update" [ref=f1e1191] [cursor=pointer]

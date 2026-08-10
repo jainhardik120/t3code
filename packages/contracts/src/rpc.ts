@@ -159,7 +159,13 @@ import {
   ResourceTelemetryRetryResult,
   ResourceTelemetrySnapshot,
 } from "./resourceTelemetry.ts";
-import { UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
+import {
+  ThreadUsageCost,
+  ThreadUsageCostInput,
+  UsageReadError,
+  UsageSummary,
+  UsageSummaryInput,
+} from "./usage.ts";
 import { ServerSettings, ServerSettingsError, ServerSettingsPatch } from "./settings.ts";
 import {
   SourceControlCloneRepositoryInput,
@@ -253,6 +259,7 @@ export const WS_METHODS = {
   serverReportHostPowerState: "server.reportHostPowerState",
   serverGetBackgroundPolicy: "server.getBackgroundPolicy",
   serverGetUsageSummary: "server.getUsageSummary",
+  serverGetThreadUsageCost: "server.getThreadUsageCost",
 
   // Cloud environment methods
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
@@ -397,6 +404,13 @@ export const WsServerRetryResourceTelemetryRpc = Rpc.make(WS_METHODS.serverRetry
 export const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
   payload: UsageSummaryInput,
   success: UsageSummary,
+  error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
+});
+
+/** Cost of one thread's current provider session. Null when it has no transcript. */
+export const WsServerGetThreadUsageCostRpc = Rpc.make(WS_METHODS.serverGetThreadUsageCost, {
+  payload: ThreadUsageCostInput,
+  success: Schema.NullOr(ThreadUsageCost),
   error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
 });
 
@@ -851,6 +865,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetResourceTelemetryHistoryRpc,
   WsServerRetryResourceTelemetryRpc,
   WsServerGetUsageSummaryRpc,
+  WsServerGetThreadUsageCostRpc,
   WsServerSignalProcessRpc,
   WsServerReportClientActivityRpc,
   WsServerReportHostPowerStateRpc,

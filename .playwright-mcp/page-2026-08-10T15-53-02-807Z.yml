@@ -1,0 +1,413 @@
+- generic [ref=f1e1]:
+    - generic [ref=f1e3]:
+        - generic [ref=f1e6]:
+            - link "Go to threads" [ref=f1e8] [cursor=pointer]:
+                - /url: /
+                - img "T3" [ref=f1e9]
+                - generic [ref=f1e11]: Code
+            - generic [ref=f1e13]:
+                - generic [ref=f1e14]:
+                    - combobox "Search threads" [ref=f1e20]
+                    - button "New thread" [ref=f1e22] [cursor=pointer]
+                - generic [ref=f1e26]:
+                    - button "Filter threads by project" [ref=f1e27] [cursor=pointer]:
+                        - generic [ref=f1e30]: All projects
+                    - button "New project" [ref=f1e33] [cursor=pointer]
+            - list [ref=f1e39]:
+                - status [ref=f1e40]
+                - listitem [ref=f1e41]:
+                    - button "Home 32m Snooze thread Settle thread Set Up Acer Battery Charging" [ref=f1e1192] [cursor=pointer]:
+                        - generic [ref=f1e43]:
+                            - generic [ref=f1e44]:
+                                - generic [ref=f1e47]: Home
+                                - generic [ref=f1e48]:
+                                    - generic: 32m
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e49]: Set Up Acer Battery Charging
+                - listitem [ref=f1e52]:
+                    - button "t3code Snooze thread Settle thread Why T3 Code Uses Repo Node Modules feat/android-fcm-push" [ref=f1e53] [cursor=pointer]:
+                        - generic [ref=f1e54]:
+                            - generic [ref=f1e55]:
+                                - generic [ref=f1e56]: t3code
+                                - generic [ref=f1e57]:
+                                    - generic:
+                                        - generic:
+                                            - status: Working
+                                            - generic: 24m
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e58]: Why T3 Code Uses Repo Node Modules
+                            - generic [ref=f1e60]: feat/android-fcm-push
+                - listitem [ref=f1e62]:
+                    - button "Home 10h Snooze thread Settle thread Troubleshoot GNOME Monitor Extension" [ref=f1e63] [cursor=pointer]:
+                        - generic [ref=f1e64]:
+                            - generic [ref=f1e65]:
+                                - generic [ref=f1e68]: Home
+                                - generic [ref=f1e69]:
+                                    - generic: 10h
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e70]: Troubleshoot GNOME Monitor Extension
+                - listitem [ref=f1e73]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Deploy ESP32 With GPIO Control main" [ref=f1e74] [cursor=pointer]:
+                        - generic [ref=f1e75]:
+                            - generic [ref=f1e76]:
+                                - generic [ref=f1e79]: Helix Kit
+                                - generic [ref=f1e80]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e81]: Deploy ESP32 With GPIO Control
+                            - generic [ref=f1e83]: main
+                - listitem [ref=f1e85]:
+                    - button "Helix Kit 1d Snooze thread Settle thread Implement PDF Reporting Package main" [ref=f1e86] [cursor=pointer]:
+                        - generic [ref=f1e87]:
+                            - generic [ref=f1e88]:
+                                - generic [ref=f1e91]: Helix Kit
+                                - generic [ref=f1e92]:
+                                    - generic: 1d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e93]: Implement PDF Reporting Package
+                            - generic [ref=f1e95]: main
+                - listitem [ref=f1e97]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Radxa Board NPU Precision Support main" [ref=f1e98] [cursor=pointer]:
+                        - generic [ref=f1e99]:
+                            - generic [ref=f1e100]:
+                                - generic [ref=f1e103]: Helix Kit
+                                - generic [ref=f1e104]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e105]: Radxa Board NPU Precision Support
+                            - generic [ref=f1e107]: main
+                - listitem [ref=f1e109]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Define Embedded Hardware Intelligence Platform main" [ref=f1e110] [cursor=pointer]:
+                        - generic [ref=f1e111]:
+                            - generic [ref=f1e112]:
+                                - generic [ref=f1e115]: Helix Kit
+                                - generic [ref=f1e116]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e117]: Define Embedded Hardware Intelligence Platform
+                            - generic [ref=f1e119]: main
+                - listitem [ref=f1e121]:
+                    - button "TrakrAI Snooze thread Settle thread Add Teams Chat SDK Notification Channel main" [ref=f1e122] [cursor=pointer]:
+                        - generic [ref=f1e123]:
+                            - generic [ref=f1e124]:
+                                - generic [ref=f1e127]: TrakrAI
+                                - generic [ref=f1e128]:
+                                    - generic:
+                                        - generic:
+                                            - status: Working
+                                            - generic: 43m
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e129]: Add Teams Chat SDK Notification Channel
+                            - generic [ref=f1e131]: main
+                - listitem [ref=f1e133]:
+                    - button "Helix Kit 2d Snooze thread Settle thread Plan Sitewide AI Agent and MCP main" [ref=f1e134] [cursor=pointer]:
+                        - generic [ref=f1e135]:
+                            - generic [ref=f1e136]:
+                                - generic [ref=f1e139]: Helix Kit
+                                - generic [ref=f1e140]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e141]: Plan Sitewide AI Agent and MCP
+                            - generic [ref=f1e143]: main
+                - listitem [ref=f1e145]:
+                    - button "TrakrAI 2d Snooze thread Settle thread Canlogger Summary Report Workflow main" [ref=f1e146] [cursor=pointer]:
+                        - generic [ref=f1e147]:
+                            - generic [ref=f1e148]:
+                                - generic [ref=f1e151]: TrakrAI
+                                - generic [ref=f1e152]:
+                                    - generic: 2d
+                                    - generic:
+                                        - button "Snooze thread"
+                                        - button "Settle thread": Settle
+                            - generic [ref=f1e153]: Canlogger Summary Report Workflow
+                            - generic [ref=f1e155]: main
+                - listitem [ref=f1e157]:
+                    - button "Settled" [expanded] [ref=f1e158] [cursor=pointer]
+                - listitem [ref=f1e163]:
+                    - button "Teams Bot Prototype in Experimental 14m Un-settle thread" [ref=f1e1193] [cursor=pointer]:
+                        - generic [ref=f1e168]: Teams Bot Prototype in Experimental
+                        - generic [ref=f1e169]:
+                            - generic [ref=f1e170]: 14m
+                            - button "Un-settle thread"
+                - listitem [ref=f1e172]:
+                    - button "Test ESP32 nRF24L01 Connection 7d Un-settle thread" [ref=f1e173] [cursor=pointer]:
+                        - generic [ref=f1e177]: Test ESP32 nRF24L01 Connection
+                        - generic [ref=f1e178]:
+                            - generic [ref=f1e179]: 7d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e181]:
+                    - button "Warp SSH stale process startup 7d Un-settle thread" [ref=f1e182] [cursor=pointer]:
+                        - generic [ref=f1e186]: Warp SSH stale process startup
+                        - generic [ref=f1e187]:
+                            - generic [ref=f1e188]: 7d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e190]:
+                    - button "Benchmark USB Drives for Development 7d Un-settle thread" [ref=f1e191] [cursor=pointer]:
+                        - generic [ref=f1e195]: Benchmark USB Drives for Development
+                        - generic [ref=f1e196]:
+                            - generic [ref=f1e197]: 7d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e199]:
+                    - button "Polish Blog Navigation and Sharing 8d Un-settle thread" [ref=f1e200] [cursor=pointer]:
+                        - generic [ref=f1e204]: Polish Blog Navigation and Sharing
+                        - generic [ref=f1e205]:
+                            - generic [ref=f1e206]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e208]:
+                    - button "Fetch Published Helix Blog Posts 8d Un-settle thread" [ref=f1e209] [cursor=pointer]:
+                        - generic [ref=f1e213]: Fetch Published Helix Blog Posts
+                        - generic [ref=f1e214]:
+                            - generic [ref=f1e215]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e217]:
+                    - button "Clean Up Worktrees and Branches 8d Un-settle thread" [ref=f1e218] [cursor=pointer]:
+                        - generic [ref=f1e222]: Clean Up Worktrees and Branches
+                        - generic [ref=f1e223]:
+                            - generic [ref=f1e224]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e226]:
+                    - button "Create Helix-163 Worktree and Tunnel Dev Server 8d Un-settle thread" [ref=f1e227] [cursor=pointer]:
+                        - generic [ref=f1e231]: Create Helix-163 Worktree and Tunnel Dev Server
+                        - generic [ref=f1e232]:
+                            - generic [ref=f1e233]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e235]:
+                    - button "Restore Radxa LLM Experiment Files 8d Un-settle thread" [ref=f1e236] [cursor=pointer]:
+                        - generic [ref=f1e240]: Restore Radxa LLM Experiment Files
+                        - generic [ref=f1e241]:
+                            - generic [ref=f1e242]: 8d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e244]:
+                    - button "Automate STM32 Flashing via ESP32 9d Un-settle thread" [ref=f1e245] [cursor=pointer]:
+                        - generic [ref=f1e249]: Automate STM32 Flashing via ESP32
+                        - generic [ref=f1e250]:
+                            - generic [ref=f1e251]: 9d
+                            - button "Un-settle thread"
+                - listitem [ref=f1e253]:
+                    - button "Show 25 more" [ref=f1e254] [cursor=pointer]
+            - list [ref=f1e257]:
+                - listitem [ref=f1e258]:
+                    - button "Usage" [ref=f1e259] [cursor=pointer]
+                - listitem [ref=f1e262]:
+                    - button "Settings" [ref=f1e263] [cursor=pointer]
+            - button "Resize Sidebar" [ref=f1e268]
+        - main [ref=f1e269]:
+            - generic [ref=f1e270]:
+                - navigation "Usage breadcrumb" [ref=f1e272]:
+                    - list [ref=f1e273]:
+                        - listitem [ref=f1e274]: Usage
+                - generic [ref=f1e276]:
+                    - generic [ref=f1e277]:
+                        - paragraph [ref=f1e278]: Jul 12 to Aug 10
+                        - generic [ref=f1e279]:
+                            - generic [ref=f1e280]:
+                                - button "7 days" [ref=f1e281] [cursor=pointer]
+                                - button "30 days" [ref=f1e282] [cursor=pointer]
+                                - button "90 days" [ref=f1e283] [cursor=pointer]
+                            - button "Refresh usage" [ref=f1e284] [cursor=pointer]
+                    - generic [ref=f1e290]:
+                        - generic [ref=f1e291]:
+                            - generic [ref=f1e292]:
+                                - generic [ref=f1e293]: Raw token cost
+                                - generic [ref=f1e294]: $4,906.44*
+                                - generic [ref=f1e295]: "* if billed at full API rate"
+                            - generic [ref=f1e296]:
+                                - generic [ref=f1e297]:
+                                    - generic [ref=f1e298]: Claude Code
+                                    - generic [ref=f1e301]: $4,903.80
+                                - generic [ref=f1e304]: 99.9% of cost · 7.32B tokens
+                            - generic [ref=f1e305]:
+                                - generic [ref=f1e306]:
+                                    - generic [ref=f1e307]: Codex
+                                    - generic [ref=f1e310]: $2.64
+                                - generic [ref=f1e313]: 0.1% of cost · 2.27M tokens
+                        - generic [ref=f1e314]:
+                            - generic [ref=f1e315]:
+                                - heading "Daily cost" [level=2] [ref=f1e316]
+                                - generic [ref=f1e317]:
+                                    - generic [ref=f1e318]:
+                                        - button "cost" [ref=f1e319] [cursor=pointer]
+                                        - button "tokens" [ref=f1e320] [cursor=pointer]
+                                    - generic [ref=f1e321]:
+                                        - generic [ref=f1e322]: Codex
+                                        - generic [ref=f1e325]: Claude Code
+                            - generic [ref=f1e328]:
+                                - generic [ref=f1e329]:
+                                    - generic [ref=f1e330]:
+                                        - generic [ref=f1e331]: "0"
+                                        - generic [ref=f1e332]: $200.00
+                                        - generic [ref=f1e333]: $400.00
+                                        - generic [ref=f1e334]: $600.00
+                                    - img "Daily cost by provider" [ref=f1e336]
+                                - generic [ref=f1e341]:
+                                    - generic [ref=f1e342]: Jul 12
+                                    - generic [ref=f1e343]: Jul 27
+                                    - generic [ref=f1e344]: Aug 10
+                    - generic [ref=f1e345]:
+                        - generic [ref=f1e346]:
+                            - generic [ref=f1e347]: Processed tokens
+                            - generic [ref=f1e348]: 7.32B
+                            - generic [ref=f1e349]: 253M per active day
+                        - generic [ref=f1e350]:
+                            - generic [ref=f1e351]: Cached input
+                            - generic [ref=f1e352]: 7.16B
+                            - generic [ref=f1e353]: 100.0% of observed input
+                        - generic [ref=f1e354]:
+                            - generic [ref=f1e355]: Uncached input
+                            - generic [ref=f1e356]: 568K
+                            - generic [ref=f1e357]: 144M cache writes
+                        - generic [ref=f1e358]:
+                            - generic [ref=f1e359]: Output
+                            - generic [ref=f1e360]: 17M
+                            - generic [ref=f1e361]: includes 3.01K reasoning
+                        - generic [ref=f1e362]:
+                            - generic [ref=f1e363]: Cache savings
+                            - generic [ref=f1e364]: $32,205.71
+                            - generic [ref=f1e365]: 6.6x the raw token cost
+                    - generic [ref=f1e366]:
+                        - generic [ref=f1e367]:
+                            - heading "Breakdown" [level=2] [ref=f1e368]
+                            - generic [ref=f1e369]:
+                                - button "model" [ref=f1e370] [cursor=pointer]
+                                - button "day" [ref=f1e371] [cursor=pointer]
+                                - button "project" [active] [ref=f1e372] [cursor=pointer]
+                                - button "session" [ref=f1e373] [cursor=pointer]
+                        - table [ref=f1e1194]:
+                            - rowgroup [ref=f1e1197]:
+                                - row [ref=f1e1198]:
+                                    - columnheader "Project" [ref=f1e1199]
+                                    - columnheader "Codex" [ref=f1e1200]
+                                    - columnheader "Claude Code" [ref=f1e1201]
+                                    - columnheader "Total" [ref=f1e1202]
+                                    - columnheader "Tokens" [ref=f1e1203]
+                                    - columnheader "Sessions" [ref=f1e1204]
+                            - rowgroup [ref=f1e1205]:
+                                - row [ref=f1e1206]:
+                                    - cell "code/helix" [ref=f1e1207]:
+                                        - generic "/home/jainhardik120/code/helix" [ref=f1e1208]: code/helix
+                                    - cell "$0.20" [ref=f1e1209]
+                                    - cell "$3,620.39" [ref=f1e1210]
+                                    - cell "$3,620.59" [ref=f1e1211]
+                                    - cell "5.38B" [ref=f1e1212]
+                                    - cell "38" [ref=f1e1213]
+                                - row [ref=f1e1214]:
+                                    - cell "hacklab/trakrai" [ref=f1e1215]:
+                                        - generic "/home/jainhardik120/code/hacklab/trakrai" [ref=f1e1216]: hacklab/trakrai
+                                    - cell "$0.00" [ref=f1e1217]
+                                    - cell "$939.30" [ref=f1e1218]
+                                    - cell "$939.30" [ref=f1e1219]
+                                    - cell "1.46B" [ref=f1e1220]
+                                    - cell "3" [ref=f1e1221]
+                                - row [ref=f1e1222]:
+                                    - cell "code/t3code" [ref=f1e1223]:
+                                        - generic "/home/jainhardik120/code/t3code" [ref=f1e1224]: code/t3code
+                                    - cell "$1.20" [ref=f1e1225]
+                                    - cell "$281.36" [ref=f1e1226]
+                                    - cell "$282.56" [ref=f1e1227]
+                                    - cell "417M" [ref=f1e1228]
+                                    - cell "6" [ref=f1e1229]
+                                - row [ref=f1e1230]:
+                                    - cell "core/helix-backend" [ref=f1e1231]:
+                                        - generic "/home/jainhardik120/code/helix/web/packages/core/helix-backend" [ref=f1e1232]: core/helix-backend
+                                    - cell "$0.00" [ref=f1e1233]
+                                    - cell "$33.38" [ref=f1e1234]
+                                    - cell "$33.38" [ref=f1e1235]
+                                    - cell "38.3M" [ref=f1e1236]
+                                    - cell "1" [ref=f1e1237]
+                                - row [ref=f1e1238]:
+                                    - cell "home/jainhardik120" [ref=f1e1239]:
+                                        - generic "/home/jainhardik120" [ref=f1e1240]: home/jainhardik120
+                                    - cell "$0.00" [ref=f1e1241]
+                                    - cell "$20.72" [ref=f1e1242]
+                                    - cell "$20.72" [ref=f1e1243]
+                                    - cell "19.6M" [ref=f1e1244]
+                                    - cell "7" [ref=f1e1245]
+                                - row [ref=f1e1246]:
+                                    - cell "hacklab/trakrboard-frontend" [ref=f1e1247]:
+                                        - generic "/home/jainhardik120/code/hacklab/trakrboard-frontend" [ref=f1e1248]: hacklab/trakrboard-frontend
+                                    - cell "$0.00" [ref=f1e1249]
+                                    - cell "$3.61" [ref=f1e1250]
+                                    - cell "$3.61" [ref=f1e1251]
+                                    - cell "3.88M" [ref=f1e1252]
+                                    - cell "1" [ref=f1e1253]
+                                - row [ref=f1e1254]:
+                                    - cell "hacklab/enterpriseVPN" [ref=f1e1255]:
+                                        - generic "/home/jainhardik120/code/hacklab/enterpriseVPN" [ref=f1e1256]: hacklab/enterpriseVPN
+                                    - cell "$0.00" [ref=f1e1257]
+                                    - cell "$3.48" [ref=f1e1258]
+                                    - cell "$3.48" [ref=f1e1259]
+                                    - cell "2.20M" [ref=f1e1260]
+                                    - cell "1" [ref=f1e1261]
+                                - row [ref=f1e1262]:
+                                    - cell "code/DevBench" [ref=f1e1263]:
+                                        - generic "/home/jainhardik120/code/DevBench" [ref=f1e1264]: code/DevBench
+                                    - cell "$0.00" [ref=f1e1265]
+                                    - cell "$1.24" [ref=f1e1266]
+                                    - cell "$1.24" [ref=f1e1267]
+                                    - cell "1.43M" [ref=f1e1268]
+                                    - cell "1" [ref=f1e1269]
+                                - row [ref=f1e1270]:
+                                    - cell "Downloads/reports" [ref=f1e1271]:
+                                        - generic "/home/jainhardik120/Downloads/reports" [ref=f1e1272]: Downloads/reports
+                                    - cell "$1.24" [ref=f1e1273]
+                                    - cell "$0.00" [ref=f1e1274]
+                                    - cell "$1.24" [ref=f1e1275]
+                                    - cell "992K" [ref=f1e1276]
+                                    - cell "1" [ref=f1e1277]
+                                - row [ref=f1e1278]:
+                                    - cell "helix-worktrees/HELIX-153" [ref=f1e1279]:
+                                        - generic "/home/jainhardik120/code/helix-worktrees/HELIX-153" [ref=f1e1280]: helix-worktrees/HELIX-153
+                                    - cell "$0.00" [ref=f1e1281]
+                                    - cell "$0.31" [ref=f1e1282]
+                                    - cell "$0.31" [ref=f1e1283]
+                                    - cell "145K" [ref=f1e1284]
+                                    - cell "1" [ref=f1e1285]
+                                - row [ref=f1e1286]:
+                                    - cell "jainhardik120/code" [ref=f1e1287]:
+                                        - generic "/home/jainhardik120/code" [ref=f1e1288]: jainhardik120/code
+                                    - cell "$0.00" [ref=f1e1289]
+                                    - cell "$0.00" [ref=f1e1290]
+                                    - cell "$0.00" [ref=f1e1291]
+                                    - cell "0" [ref=f1e1292]
+                                    - cell "1" [ref=f1e1293]
+                                - row [ref=f1e1294]:
+                                    - cell "apps/helix" [ref=f1e1295]:
+                                        - generic "/home/jainhardik120/code/helix/web/apps/helix" [ref=f1e1296]: apps/helix
+                                    - cell "$0.00" [ref=f1e1297]
+                                    - cell "$0.00" [ref=f1e1298]
+                                    - cell "$0.00" [ref=f1e1299]
+                                    - cell "0" [ref=f1e1300]
+                                    - cell "1" [ref=f1e1301]
+        - button "Toggle main sidebar" [pressed] [ref=f1e1175] [cursor=pointer]:
+            - generic [ref=f1e1176]: Toggle Sidebar
+    - generic:
+        - region "Notifications"
+    - generic:
+        - region "Notifications":
+            - dialog [ref=f1e1177]:
+                - button "Dismiss notification" [ref=f1e1179] [cursor=pointer]
+                - generic [ref=f1e1183]:
+                    - generic [ref=f1e1186]:
+                        - 'heading "Updates Available: 2 providers" [level=2] [ref=f1e1187]'
+                        - paragraph [ref=f1e1188]: Install the update now or review provider settings.
+                    - generic [ref=f1e1189]:
+                        - button "Settings" [ref=f1e1190] [cursor=pointer]
+                        - button "Update" [ref=f1e1191] [cursor=pointer]
