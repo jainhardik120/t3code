@@ -9,7 +9,9 @@
 import type {
   EnvironmentId,
   UsageBucket,
+  UsageProjectBucket,
   UsageProviderKind,
+  UsageSessionBucket,
   UsageSourceFingerprint,
   UsageSummary,
 } from "@t3tools/contracts";
@@ -38,6 +40,31 @@ export interface ModelTotals {
   readonly costShare: number;
 }
 
+export interface ProjectTotals {
+  readonly projectPath: string;
+  readonly provider: UsageProviderKind;
+  readonly costUsd: number;
+  readonly totalTokens: number;
+  readonly records: number;
+  readonly sessions: number;
+  readonly costShare: number;
+  readonly firstDay: string;
+  readonly lastDay: string;
+}
+
+export interface SessionTotals {
+  readonly sessionId: string;
+  readonly projectPath: string;
+  readonly provider: UsageProviderKind;
+  readonly models: readonly string[];
+  readonly costUsd: number;
+  readonly totalTokens: number;
+  readonly records: number;
+  readonly costShare: number;
+  readonly firstDay: string;
+  readonly lastDay: string;
+}
+
 export interface DailyTotals {
   readonly day: string;
   readonly costUsd: number;
@@ -64,6 +91,8 @@ export interface MergedUsage {
   readonly sessions: number;
   readonly providers: readonly ProviderTotals[];
   readonly models: readonly ModelTotals[];
+  readonly projects: readonly ProjectTotals[];
+  readonly sessionTotals: readonly SessionTotals[];
   readonly daily: readonly DailyTotals[];
   readonly costQuality: CostQuality;
   /** Environments whose data was dropped as a duplicate of another's. */
@@ -126,7 +155,12 @@ function claimSources(environments: readonly EnvironmentUsage[]): {
 function ownedContribution(
   environment: EnvironmentUsage,
   ownerByFingerprint: ReadonlyMap<string, EnvironmentId>,
-): { readonly buckets: readonly UsageBucket[]; readonly sessions: number } {
+): {
+  readonly buckets: readonly UsageBucket[];
+  readonly projects: readonly UsageProjectBucket[];
+  readonly sessionBuckets: readonly UsageSessionBucket[];
+  readonly sessions: number;
+} {
   const ownedProviders = new Set<UsageProviderKind>();
   let sessions = 0;
   for (const source of environment.summary.sources) {
@@ -139,19 +173,28 @@ function ownedContribution(
       sessions += source.distinctSessions;
     }
   }
+  // Every axis is filtered by the same owned-provider set, so a dropped
+  // duplicate directory disappears from all three consistently.
   return {
     buckets: environment.summary.buckets.filter((bucket) => ownedProviders.has(bucket.provider)),
+    projects: environment.summary.projects.filter((project) =>
+      ownedProviders.has(project.provider),
+    ),
+    sessionBuckets: environment.summary.sessions.filter((session) =>
+      ownedProviders.has(session.provider),
+    ),
     sessions,
   };
 }
 
-function bucketTokens(bucket: UsageBucket): number {
+/** Token total for any row carrying `UsageTokenTotals`. */
+function rowTokens(row: { readonly totals: UsageBucket["totals"] }): number {
   // reasoningTokens is a subset of outputTokens and must not be added again.
   return (
-    bucket.totals.uncachedInputTokens +
-    bucket.totals.cachedInputTokens +
-    bucket.totals.cacheCreationTokens +
-    bucket.totals.outputTokens
+    row.totals.uncachedInputTokens +
+    row.totals.cachedInputTokens +
+    row.totals.cacheCreationTokens +
+    row.totals.outputTokens
   );
 }
 
@@ -167,6 +210,8 @@ const EMPTY_MERGED: MergedUsage = {
   sessions: 0,
   providers: [],
   models: [],
+  projects: [],
+  sessionTotals: [],
   daily: [],
   costQuality: {
     providerReportedShare: 0,
@@ -224,6 +269,32 @@ export function mergeUsage(
     string,
     { provider: UsageProviderKind; costUsd: number; totalTokens: number; records: number }
   >();
+  const projectAccumulator = new Map<
+    string,
+    {
+      projectPath: string;
+      provider: UsageProviderKind;
+      costUsd: number;
+      totalTokens: number;
+      records: number;
+      sessions: number;
+      firstDay: string;
+      lastDay: string;
+    }
+  >();
+  const sessionAccumulator = new Map<
+    string,
+    {
+      projectPath: string;
+      provider: UsageProviderKind;
+      models: Set<string>;
+      costUsd: number;
+      totalTokens: number;
+      records: number;
+      firstDay: string;
+      lastDay: string;
+    }
+  >();
   const dailyAccumulator = new Map<
     string,
     {
@@ -235,15 +306,17 @@ export function mergeUsage(
   const contributingEnvironments: EnvironmentId[] = [];
 
   for (const environment of current) {
-    const { buckets, sessions: environmentSessions } = ownedContribution(
-      environment,
-      ownerByFingerprint,
-    );
+    const {
+      buckets,
+      projects: environmentProjects,
+      sessionBuckets,
+      sessions: environmentSessions,
+    } = ownedContribution(environment, ownerByFingerprint);
     if (buckets.length > 0) contributingEnvironments.push(environment.environmentId);
     sessions += environmentSessions;
 
     for (const bucket of buckets) {
-      const tokens = bucketTokens(bucket);
+      const tokens = rowTokens(bucket);
 
       costUsd += bucket.costUsd;
       cacheSavingsUsd += bucket.cacheSavingsUsd;
@@ -291,6 +364,56 @@ export function mergeUsage(
       day.byProvider.set(bucket.provider, dayProvider);
       dailyAccumulator.set(bucket.day, day);
     }
+
+    // Two environments on different machines can legitimately report the same
+    // project path; fingerprint claiming has already removed the case where
+    // they are the same directory read twice, so these merge.
+    for (const project of environmentProjects) {
+      const key = `${project.provider} ${project.projectPath}`;
+      const existing = projectAccumulator.get(key);
+      if (existing === undefined) {
+        projectAccumulator.set(key, {
+          projectPath: project.projectPath,
+          provider: project.provider,
+          costUsd: project.costUsd,
+          totalTokens: rowTokens(project),
+          records: project.records,
+          sessions: project.sessions,
+          firstDay: project.firstDay,
+          lastDay: project.lastDay,
+        });
+        continue;
+      }
+      existing.costUsd += project.costUsd;
+      existing.totalTokens += rowTokens(project);
+      existing.records += project.records;
+      existing.sessions += project.sessions;
+      if (project.firstDay < existing.firstDay) existing.firstDay = project.firstDay;
+      if (project.lastDay > existing.lastDay) existing.lastDay = project.lastDay;
+    }
+
+    for (const session of sessionBuckets) {
+      const existing = sessionAccumulator.get(session.sessionId);
+      if (existing === undefined) {
+        sessionAccumulator.set(session.sessionId, {
+          projectPath: session.projectPath,
+          provider: session.provider,
+          models: new Set(session.models),
+          costUsd: session.costUsd,
+          totalTokens: rowTokens(session),
+          records: session.records,
+          firstDay: session.firstDay,
+          lastDay: session.lastDay,
+        });
+        continue;
+      }
+      existing.costUsd += session.costUsd;
+      existing.totalTokens += rowTokens(session);
+      existing.records += session.records;
+      for (const model of session.models) existing.models.add(model);
+      if (session.firstDay < existing.firstDay) existing.firstDay = session.firstDay;
+      if (session.lastDay > existing.lastDay) existing.lastDay = session.lastDay;
+    }
   }
 
   const totalTokens = uncachedInputTokens + cachedInputTokens + cacheCreationTokens + outputTokens;
@@ -317,6 +440,35 @@ export function mergeUsage(
     }))
     .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens);
 
+  const projects: ProjectTotals[] = [...projectAccumulator.values()]
+    .map((totals) => ({
+      projectPath: totals.projectPath,
+      provider: totals.provider,
+      costUsd: totals.costUsd,
+      totalTokens: totals.totalTokens,
+      records: totals.records,
+      sessions: totals.sessions,
+      costShare: costUsd === 0 ? 0 : totals.costUsd / costUsd,
+      firstDay: totals.firstDay,
+      lastDay: totals.lastDay,
+    }))
+    .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens);
+
+  const sessionTotals: SessionTotals[] = [...sessionAccumulator.entries()]
+    .map(([sessionId, totals]) => ({
+      sessionId,
+      projectPath: totals.projectPath,
+      provider: totals.provider,
+      models: [...totals.models].sort(),
+      costUsd: totals.costUsd,
+      totalTokens: totals.totalTokens,
+      records: totals.records,
+      costShare: costUsd === 0 ? 0 : totals.costUsd / costUsd,
+      firstDay: totals.firstDay,
+      lastDay: totals.lastDay,
+    }))
+    .sort((a, b) => b.costUsd - a.costUsd || b.totalTokens - a.totalTokens);
+
   const daily: DailyTotals[] = [...dailyAccumulator.entries()]
     .map(([day, totals]) => ({
       day,
@@ -338,6 +490,8 @@ export function mergeUsage(
     sessions,
     providers,
     models,
+    projects,
+    sessionTotals,
     daily,
     costQuality: {
       providerReportedShare: records === 0 ? 0 : providerReportedRecords / records,

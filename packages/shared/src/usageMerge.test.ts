@@ -3,7 +3,9 @@ import {
   type EnvironmentId,
   type UsageBucket,
   type UsageDay,
+  type UsageProjectBucket,
   type UsageProviderKind,
+  type UsageSessionBucket,
   type UsageSummary,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
@@ -32,6 +34,53 @@ function bucket(overrides: Partial<UsageBucket> = {}): UsageBucket {
   };
 }
 
+function project(overrides: Partial<UsageProjectBucket> = {}): UsageProjectBucket {
+  return {
+    projectPath: "/home/dev/alpha",
+    provider: "claude",
+    totals: {
+      uncachedInputTokens: 100,
+      cachedInputTokens: 1000,
+      cacheCreationTokens: 10,
+      outputTokens: 50,
+      reasoningTokens: 0,
+    },
+    costUsd: 10,
+    cacheSavingsUsd: 2,
+    costSource: "modelPriced",
+    records: 5,
+    unpricedRecords: 0,
+    sessions: 1,
+    firstDay: "2026-08-07" as UsageDay,
+    lastDay: "2026-08-07" as UsageDay,
+    ...overrides,
+  };
+}
+
+function session(overrides: Partial<UsageSessionBucket> = {}): UsageSessionBucket {
+  return {
+    sessionId: "session-a",
+    projectPath: "/home/dev/alpha",
+    provider: "claude",
+    models: ["claude-fable-5"],
+    totals: {
+      uncachedInputTokens: 100,
+      cachedInputTokens: 1000,
+      cacheCreationTokens: 10,
+      outputTokens: 50,
+      reasoningTokens: 0,
+    },
+    costUsd: 10,
+    cacheSavingsUsd: 2,
+    costSource: "modelPriced",
+    records: 5,
+    unpricedRecords: 0,
+    firstDay: "2026-08-07" as UsageDay,
+    lastDay: "2026-08-07" as UsageDay,
+    ...overrides,
+  };
+}
+
 function summary(
   buckets: readonly UsageBucket[],
   sources: readonly {
@@ -42,6 +91,10 @@ function summary(
     distinctSessions?: number;
   }[],
   contractVersion: number = USAGE_CONTRACT_VERSION,
+  rollups: {
+    projects?: readonly UsageProjectBucket[];
+    sessions?: readonly UsageSessionBucket[];
+  } = {},
 ): UsageSummary {
   return {
     contractVersion,
@@ -50,6 +103,8 @@ function summary(
     sinceDay: "2026-08-01" as UsageDay,
     untilDay: "2026-08-31" as UsageDay,
     buckets,
+    projects: rollups.projects ?? [],
+    sessions: rollups.sessions ?? [],
     sources: sources.map((source) => ({
       fingerprint: {
         hostId: source.hostId,
@@ -254,5 +309,113 @@ describe("mergeUsage", () => {
     const merged = mergeUsage([], USAGE_CONTRACT_VERSION);
     expect(merged.costUsd).toBe(0);
     expect(merged.daily).toHaveLength(0);
+  });
+
+  it("merges the same project reported by two machines and ranks by cost", () => {
+    const merged = mergeUsage(
+      [
+        environment(
+          "env-a",
+          summary([bucket()], [{ provider: "claude", hostId: "mac", homePath: "/a/.claude" }], 4, {
+            projects: [
+              project({ projectPath: "/home/dev/alpha", costUsd: 10, sessions: 1 }),
+              project({ projectPath: "/home/dev/beta", costUsd: 40, sessions: 2 }),
+            ],
+          }),
+        ),
+        environment(
+          "env-b",
+          summary(
+            [bucket()],
+            [{ provider: "claude", hostId: "linux", homePath: "/b/.claude" }],
+            4,
+            {
+              projects: [project({ projectPath: "/home/dev/alpha", costUsd: 5, sessions: 3 })],
+            },
+          ),
+        ),
+      ],
+      USAGE_CONTRACT_VERSION,
+    );
+
+    expect(merged.projects).toHaveLength(2);
+    // Costliest first, and the shared path collapses into one row.
+    expect(merged.projects[0]?.projectPath).toBe("/home/dev/beta");
+    expect(merged.projects[1]?.projectPath).toBe("/home/dev/alpha");
+    expect(merged.projects[1]?.costUsd).toBe(15);
+    expect(merged.projects[1]?.sessions).toBe(4);
+  });
+
+  it("widens a session's day span and unions its models across environments", () => {
+    const merged = mergeUsage(
+      [
+        environment(
+          "env-a",
+          summary([bucket()], [{ provider: "claude", hostId: "mac", homePath: "/a/.claude" }], 4, {
+            sessions: [
+              session({
+                sessionId: "shared",
+                models: ["claude-fable-5"],
+                firstDay: "2026-08-05" as UsageDay,
+                lastDay: "2026-08-06" as UsageDay,
+              }),
+            ],
+          }),
+        ),
+        environment(
+          "env-b",
+          summary(
+            [bucket()],
+            [{ provider: "claude", hostId: "linux", homePath: "/b/.claude" }],
+            4,
+            {
+              sessions: [
+                session({
+                  sessionId: "shared",
+                  models: ["claude-opus-5"],
+                  firstDay: "2026-08-04" as UsageDay,
+                  lastDay: "2026-08-05" as UsageDay,
+                }),
+              ],
+            },
+          ),
+        ),
+      ],
+      USAGE_CONTRACT_VERSION,
+    );
+
+    expect(merged.sessionTotals).toHaveLength(1);
+    expect(merged.sessionTotals[0]?.models).toEqual(["claude-fable-5", "claude-opus-5"]);
+    expect(merged.sessionTotals[0]?.firstDay).toBe("2026-08-04");
+    expect(merged.sessionTotals[0]?.lastDay).toBe("2026-08-06");
+  });
+
+  it("drops project and session rollups from an environment whose source lost the claim", () => {
+    // Same fingerprint from both environments: env-a claims it, so env-b's
+    // rollups must vanish from every axis, not just from buckets.
+    const source = { provider: "claude" as const, hostId: "mac", homePath: "/shared/.claude" };
+    const merged = mergeUsage(
+      [
+        environment(
+          "env-a",
+          summary([bucket()], [source], 4, {
+            projects: [project({ costUsd: 10 })],
+            sessions: [session({ sessionId: "a", costUsd: 10 })],
+          }),
+        ),
+        environment(
+          "env-b",
+          summary([bucket()], [source], 4, {
+            projects: [project({ costUsd: 999 })],
+            sessions: [session({ sessionId: "b", costUsd: 999 })],
+          }),
+        ),
+      ],
+      USAGE_CONTRACT_VERSION,
+    );
+
+    expect(merged.projects).toHaveLength(1);
+    expect(merged.projects[0]?.costUsd).toBe(10);
+    expect(merged.sessionTotals.map((row) => row.sessionId)).toEqual(["a"]);
   });
 });

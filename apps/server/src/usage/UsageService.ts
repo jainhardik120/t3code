@@ -104,6 +104,8 @@ export const layerTest = Layer.succeed(
         sinceDay: input.sinceDay,
         untilDay: input.untilDay,
         buckets: [],
+        projects: [],
+        sessions: [],
         sources: [],
         pricing: {
           status: "unavailable",
@@ -400,6 +402,8 @@ export const make = Effect.gen(function* () {
       sinceDay: input.sinceDay,
       untilDay: input.untilDay,
       buckets: aggregated.buckets,
+      projects: aggregated.projects,
+      sessions: aggregated.sessions,
       sources,
       pricing: {
         status: ratesStatus,

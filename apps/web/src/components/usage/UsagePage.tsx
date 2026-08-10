@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { isElectron } from "../../env";
 import { cn } from "../../lib/utils";
 import { useUsage, type EnvironmentUsageStatus } from "../../state/usage";
+import type { ProjectTotals, SessionTotals } from "@t3tools/shared/usageMerge";
 import {
   enumerateDays,
   formatCount,
@@ -21,6 +22,17 @@ import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "../../workspaceTitlebar"
 import { UsageChartLegend, UsageProviderChart, type UsageChartMetric } from "./UsageProviderChart";
 import { PROVIDER_COLOR, PROVIDER_LABEL, PROVIDER_MARK, PROVIDER_ORDER } from "./usageProviders";
 
+/** Axes the breakdown table can be sliced by. */
+const BREAKDOWN_OPTIONS = ["model", "day", "project", "session"] as const;
+type Breakdown = (typeof BREAKDOWN_OPTIONS)[number];
+
+/**
+ * Sessions are unbounded — a busy month runs to hundreds — so the table shows
+ * the costliest slice and says how many it left out rather than rendering every
+ * row or truncating silently.
+ */
+const SESSION_ROW_LIMIT = 50;
+
 const WINDOW_OPTIONS = [
   { days: 7, label: "7 days" },
   { days: 30, label: "30 days" },
@@ -30,7 +42,7 @@ const WINDOW_OPTIONS = [
 export function UsagePage() {
   const [windowDays, setWindowDays] = useState<number>(30);
   const [metric, setMetric] = useState<UsageChartMetric>("cost");
-  const [breakdown, setBreakdown] = useState<"model" | "day">("model");
+  const [breakdown, setBreakdown] = useState<Breakdown>("model");
 
   // Recomputed only when the window length changes, so a re-render does not
   // shift the range and refetch every environment.
@@ -260,7 +272,7 @@ export function UsagePage() {
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-sm font-medium text-foreground">Breakdown</h2>
                     <div className="flex overflow-hidden rounded-md border border-border">
-                      {(["model", "day"] as const).map((option) => (
+                      {BREAKDOWN_OPTIONS.map((option) => (
                         <button
                           key={option}
                           type="button"
@@ -321,6 +333,10 @@ export function UsagePage() {
                         )}
                       </tbody>
                     </table>
+                  ) : breakdown === "project" ? (
+                    <ProjectBreakdown projects={merged.projects} />
+                  ) : breakdown === "session" ? (
+                    <SessionBreakdown sessions={merged.sessionTotals} />
                   ) : (
                     <table className="w-full text-sm">
                       <thead>
@@ -373,6 +389,138 @@ export function UsagePage() {
         </ScrollArea>
       </div>
     </SidebarInset>
+  );
+}
+
+/**
+ * Shortens a working directory for display: the last two segments carry the
+ * useful identity, and the full path stays available on hover.
+ */
+function projectLabel(projectPath: string): string {
+  if (projectPath.length === 0) return "Unknown project";
+  const segments = projectPath.split("/").filter((segment) => segment.length > 0);
+  if (segments.length === 0) return projectPath;
+  return segments.slice(-2).join("/");
+}
+
+/** Usage per working directory, costliest first. */
+function ProjectBreakdown({ projects }: { readonly projects: readonly ProjectTotals[] }) {
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-border text-left text-xs text-muted-foreground">
+          <th className="py-2 font-normal">Project</th>
+          <th className="py-2 text-right font-normal">Cost</th>
+          <th className="py-2 text-right font-normal">Share</th>
+          <th className="py-2 text-right font-normal">Tokens</th>
+          <th className="py-2 text-right font-normal">Sessions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {projects.length === 0 ? (
+          <tr>
+            <td colSpan={5} className="py-6 text-center text-muted-foreground">
+              No activity in this window.
+            </td>
+          </tr>
+        ) : (
+          projects.map((project) => (
+            <tr
+              key={`${project.provider}:${project.projectPath}`}
+              className="border-b border-border/50"
+            >
+              <td className="py-2 text-foreground">
+                <span className="flex items-center gap-2">
+                  <ProviderMark provider={project.provider} className="size-3.5" />
+                  <span className="truncate" title={project.projectPath || "Unknown project"}>
+                    {projectLabel(project.projectPath)}
+                  </span>
+                </span>
+              </td>
+              <td className="py-2 text-right text-foreground tabular-nums">
+                {formatUsd(project.costUsd)}
+              </td>
+              <td className="py-2 text-right text-muted-foreground tabular-nums">
+                {formatPercent(project.costShare)}
+              </td>
+              <td className="py-2 text-right text-muted-foreground tabular-nums">
+                {formatTokens(project.totalTokens)}
+              </td>
+              <td className="py-2 text-right text-muted-foreground tabular-nums">
+                {formatCount(project.sessions)}
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+/** Usage per transcript session, costliest first. */
+function SessionBreakdown({ sessions }: { readonly sessions: readonly SessionTotals[] }) {
+  const shown = sessions.slice(0, SESSION_ROW_LIMIT);
+  const hidden = sessions.length - shown.length;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            <th className="py-2 font-normal">Session</th>
+            <th className="py-2 font-normal">Project</th>
+            <th className="py-2 text-right font-normal">Cost</th>
+            <th className="py-2 text-right font-normal">Tokens</th>
+            <th className="py-2 text-right font-normal">Last active</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                No activity in this window.
+              </td>
+            </tr>
+          ) : (
+            shown.map((session) => (
+              <tr key={session.sessionId} className="border-b border-border/50">
+                <td className="py-2 text-foreground">
+                  <span className="flex items-center gap-2">
+                    <ProviderMark provider={session.provider} className="size-3.5" />
+                    <span
+                      className="font-mono text-xs"
+                      title={`${session.sessionId}\n${session.models.join(", ")}`}
+                    >
+                      {session.sessionId.slice(0, 8)}
+                    </span>
+                  </span>
+                </td>
+                <td className="py-2 text-muted-foreground">
+                  <span className="truncate" title={session.projectPath || "Unknown project"}>
+                    {projectLabel(session.projectPath)}
+                  </span>
+                </td>
+                <td className="py-2 text-right text-foreground tabular-nums">
+                  {formatUsd(session.costUsd)}
+                </td>
+                <td className="py-2 text-right text-muted-foreground tabular-nums">
+                  {formatTokens(session.totalTokens)}
+                </td>
+                <td className="py-2 text-right text-muted-foreground tabular-nums">
+                  {formatDayShort(session.lastDay)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+      {hidden > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Showing the {formatCount(shown.length)} costliest of {formatCount(sessions.length)}{" "}
+          sessions.
+        </p>
+      )}
+    </div>
   );
 }
 

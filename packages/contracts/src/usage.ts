@@ -21,7 +21,7 @@ import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
  * client renders partial coverage when an environment reports an older version
  * rather than failing the whole page.
  */
-export const USAGE_CONTRACT_VERSION = 3 as const;
+export const USAGE_CONTRACT_VERSION = 4 as const;
 
 export const UsageProviderKind = Schema.Literals(["claude", "codex"]);
 export type UsageProviderKind = typeof UsageProviderKind.Type;
@@ -95,6 +95,62 @@ export const UsageBucket = Schema.Struct({
   sessions: NonNegativeInt,
 });
 export type UsageBucket = typeof UsageBucket.Type;
+
+/**
+ * The working directory a session ran in, used as its project identity.
+ *
+ * Both CLIs record it: Claude on every transcript line, Codex once on
+ * `session_meta`. It is preferred over the encoded directory name under
+ * `~/.claude/projects`, which replaces every `/` with `-` and so cannot be
+ * decoded back to a path unambiguously. Empty when a transcript never declared
+ * one.
+ */
+export const UsageProjectPath = Schema.String;
+export type UsageProjectPath = typeof UsageProjectPath.Type;
+
+/**
+ * Usage rolled up per project across the whole window.
+ *
+ * Kept as its own axis rather than another key on {@link UsageBucket}: adding
+ * project and session to that key multiplies its cardinality by both, and the
+ * day/model grid is read far more often than either breakdown.
+ */
+export const UsageProjectBucket = Schema.Struct({
+  projectPath: UsageProjectPath,
+  provider: UsageProviderKind,
+  totals: UsageTokenTotals,
+  costUsd: Schema.Number,
+  cacheSavingsUsd: Schema.Number,
+  costSource: UsageCostSource,
+  records: NonNegativeInt,
+  unpricedRecords: NonNegativeInt,
+  /** Distinct transcript sessions that ran in this project. */
+  sessions: NonNegativeInt,
+  firstDay: UsageDay,
+  lastDay: UsageDay,
+});
+export type UsageProjectBucket = typeof UsageProjectBucket.Type;
+
+/** Usage rolled up per transcript session across the whole window. */
+export const UsageSessionBucket = Schema.Struct({
+  sessionId: TrimmedNonEmptyString,
+  projectPath: UsageProjectPath,
+  provider: UsageProviderKind,
+  /**
+   * Every model the session used, sorted. A long session commonly spans more
+   * than one, so a single "the" model would misattribute the rest.
+   */
+  models: Schema.Array(TrimmedNonEmptyString),
+  totals: UsageTokenTotals,
+  costUsd: Schema.Number,
+  cacheSavingsUsd: Schema.Number,
+  costSource: UsageCostSource,
+  records: NonNegativeInt,
+  unpricedRecords: NonNegativeInt,
+  firstDay: UsageDay,
+  lastDay: UsageDay,
+});
+export type UsageSessionBucket = typeof UsageSessionBucket.Type;
 
 /**
  * Identifies the physical transcript directory a source read from.
@@ -175,6 +231,10 @@ export const UsageSummary = Schema.Struct({
   sinceDay: UsageDay,
   untilDay: UsageDay,
   buckets: Schema.Array(UsageBucket),
+  /** Per-project rollups over the same window as `buckets`. */
+  projects: Schema.Array(UsageProjectBucket),
+  /** Per-session rollups over the same window as `buckets`. */
+  sessions: Schema.Array(UsageSessionBucket),
   sources: Schema.Array(UsageSource),
   pricing: UsagePricing,
   /** Wall-clock cost of the scan, surfaced in diagnostics. */

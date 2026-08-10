@@ -15,6 +15,7 @@ function record(overrides: Partial<UsageRecord> = {}): UsageRecord {
     timestampMs: 1_786_000_000_000,
     model: "claude-fable-5",
     sessionId: "session-a",
+    projectPath: "/home/dev/alpha",
     totals: {
       uncachedInputTokens: 2,
       cachedInputTokens: 1000,
@@ -98,7 +99,10 @@ describe("scan cache round trip", () => {
       files: {
         "/a.jsonl": {
           ...encoded.files["/a.jsonl"]!,
-          r: [rows[0]!, [...rows[1]!.slice(0, 3), "not-a-number", ...rows[1]!.slice(4)]],
+          // Index 4 is uncachedInputTokens. The interned model, session and
+          // project indices ahead of it decode leniently by design, so a
+          // strictly validated field is what proves the corrupt-row rule.
+          r: [rows[0]!, [...rows[1]!.slice(0, 4), "not-a-number", ...rows[1]!.slice(5)]],
         },
       },
     };

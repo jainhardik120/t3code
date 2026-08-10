@@ -23,6 +23,7 @@ function record(overrides: Partial<UsageRecord> = {}): UsageRecord {
     timestampMs: Date.parse("2026-08-07T04:05:13.944Z"),
     model: "claude-fable-5",
     sessionId: "session-a",
+    projectPath: "/home/dev/alpha",
     totals: {
       uncachedInputTokens: 100,
       cachedInputTokens: 1000,
@@ -128,5 +129,86 @@ describe("UsageAggregator", () => {
     ]);
 
     expect(result.buckets).toHaveLength(3);
+  });
+
+  it("anchors a session to the directory it started in", () => {
+    // Claude rewrites cwd when the agent changes directory mid-session; all of
+    // it belongs to the project the session opened in.
+    const result = aggregate([
+      record({ sessionId: "s1", projectPath: "/home/dev/repo" }),
+      record({ sessionId: "s1", projectPath: "/home/dev/repo/packages/api" }),
+      record({ sessionId: "s1", projectPath: "/home/dev/repo/web/src" }),
+    ]);
+
+    expect(result.projects).toHaveLength(1);
+    expect(result.projects[0]?.projectPath).toBe("/home/dev/repo");
+    expect(result.projects[0]?.records).toBe(3);
+    expect(result.sessions[0]?.projectPath).toBe("/home/dev/repo");
+  });
+
+  it("rolls usage up by project, keyed per provider", () => {
+    const result = aggregate([
+      record({ projectPath: "/home/dev/alpha", sessionId: "s1" }),
+      record({ projectPath: "/home/dev/alpha", sessionId: "s2" }),
+      record({ projectPath: "/home/dev/beta", sessionId: "s3" }),
+    ]);
+
+    expect(result.projects).toHaveLength(2);
+    const alpha = result.projects.find((row) => row.projectPath === "/home/dev/alpha");
+    expect(alpha?.records).toBe(2);
+    expect(alpha?.sessions).toBe(2);
+    // Every axis folds the same records, so project cost totals to bucket cost.
+    const bucketCost = result.buckets.reduce((sum, row) => sum + row.costUsd, 0);
+    const projectCost = result.projects.reduce((sum, row) => sum + row.costUsd, 0);
+    expect(projectCost).toBeCloseTo(bucketCost, 10);
+  });
+
+  it("rolls usage up by session, spanning days and models", () => {
+    const result = aggregate([
+      record({
+        sessionId: "long",
+        model: "claude-fable-5",
+        timestampMs: Date.parse("2026-08-05T10:00:00.000Z"),
+      }),
+      record({
+        sessionId: "long",
+        model: "claude-opus-5",
+        timestampMs: Date.parse("2026-08-07T10:00:00.000Z"),
+      }),
+      // Out of order on purpose: the span must widen from both ends.
+      record({
+        sessionId: "long",
+        model: "claude-fable-5",
+        timestampMs: Date.parse("2026-08-03T10:00:00.000Z"),
+      }),
+    ]);
+
+    expect(result.sessions).toHaveLength(1);
+    const session = result.sessions[0];
+    expect(session?.records).toBe(3);
+    expect(session?.models).toEqual(["claude-fable-5", "claude-opus-5"]);
+    expect(session?.firstDay).toBe("2026-08-03");
+    expect(session?.lastDay).toBe("2026-08-07");
+  });
+
+  it("keeps records with no declared project in their own row", () => {
+    const result = aggregate([record({ projectPath: "" }), record({ projectPath: "/home/dev/a" })]);
+
+    expect(result.projects.map((row) => row.projectPath).toSorted()).toEqual(["", "/home/dev/a"]);
+  });
+
+  it("excludes duplicate and out-of-window records from every axis", () => {
+    const result = aggregate([
+      record({ dedupeKey: "dup", sessionId: "s1" }),
+      record({ dedupeKey: "dup", sessionId: "s1" }),
+      record({ sessionId: "s2", timestampMs: Date.parse("2026-09-15T10:00:00.000Z") }),
+    ]);
+
+    expect(result.duplicatesDropped).toBe(1);
+    expect(result.outOfWindow).toBe(1);
+    // The dropped duplicate is counted once and the out-of-window record never
+    // appears, so no session row exists for it.
+    expect(result.sessions.map((row) => row.sessionId)).toEqual(["s1"]);
+    expect(result.sessions[0]?.records).toBe(1);
   });
 });

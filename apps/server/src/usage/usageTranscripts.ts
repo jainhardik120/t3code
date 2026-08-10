@@ -13,6 +13,11 @@ export interface UsageRecord {
   readonly timestampMs: number;
   readonly model: string;
   readonly sessionId: string;
+  /**
+   * Working directory the session ran in, used as its project identity. Empty
+   * when the transcript never declared one.
+   */
+  readonly projectPath: string;
   readonly totals: UsageTokenTotals;
   readonly reportedCostUsd: number | null;
   /**
@@ -123,6 +128,8 @@ export function parseClaudeLine(line: string): UsageRecord | null {
     timestampMs,
     model,
     sessionId: typeof record["sessionId"] === "string" ? record["sessionId"] : "",
+    // Claude repeats cwd on every line, so no carry-forward state is needed.
+    projectPath: typeof record["cwd"] === "string" ? record["cwd"] : "",
     totals: {
       uncachedInputTokens: int(usageRecord["input_tokens"]),
       cachedInputTokens: int(usageRecord["cache_read_input_tokens"]),
@@ -150,6 +157,8 @@ export function parseClaudeLine(line: string): UsageRecord | null {
 export interface CodexScanState {
   model: string;
   sessionId: string;
+  /** Declared once on `session_meta` and carried across the rollout. */
+  projectPath: string;
   lastUsageSignature: string | null;
   sawSessionMeta: boolean;
   /** While true, leading usage events are re-stamped copies of parent history. */
@@ -161,6 +170,7 @@ export function initialCodexScanState(): CodexScanState {
   return {
     model: "",
     sessionId: "",
+    projectPath: "",
     lastUsageSignature: null,
     sawSessionMeta: false,
     suppressingForkCopies: false,
@@ -220,6 +230,7 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
     state.sawSessionMeta = true;
     const id = payloadRecord["id"] ?? payloadRecord["session_id"];
     if (typeof id === "string") state.sessionId = id;
+    if (typeof payloadRecord["cwd"] === "string") state.projectPath = payloadRecord["cwd"];
     const metaTimestampMs = parseTimestampMs(record["timestamp"]);
     if (metaTimestampMs !== null && isForkedSessionMeta(payloadRecord)) {
       state.suppressingForkCopies = true;
@@ -288,6 +299,7 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
     timestampMs,
     model: state.model,
     sessionId: state.sessionId,
+    projectPath: state.projectPath,
     totals,
     // Codex does not report cost in the rollout.
     reportedCostUsd: null,
