@@ -1,8 +1,8 @@
 # Self-hosted upgrade recipe
 
 How to pull upstream changes into the self-hosted server at `t3.hardikja.in` while
-keeping the two local features (Android FCM push, windowed thread loading), and
-ship the result to the running systemd service.
+keeping the local Android FCM push feature, and ship the result to the running
+systemd service.
 
 ```
 ./infra/self-hosted/sync-upstream.sh     # fetch + merge origin/main (may stop on conflicts)
@@ -21,27 +21,30 @@ One-time, before the first `release.sh`:
 
 ## Branch layout — read this before merging anything
 
-`feat/android-fcm-push` is **the integration branch and the source of truth.** It
-already contains both features, as one checkpoint commit (`4f4637f62`) plus
-subsequent upstream merges.
+`feat/android-fcm-push` is **the integration branch and the source of truth.**
 
-The two branches that look like the features are historical forks, checked out in
+There is now exactly **one** local feature on it: self-hosted Android FCM push.
+The windowed-thread-loading feature was retired on 2026-08-10 — upstream shipped
+its own turn-based pagination (`OrchestrationThreadDetailWindow` / `page` /
+`beforeCursor`, in the shared `packages/client-runtime`), so ours was dropped in
+favour of it rather than carried as a permanent conflict. **Do not resurrect it**;
+if large threads regress, fix it in upstream's pagination.
+
+The branches that look like the features are historical forks, checked out in
 worktrees:
 
 | branch                         | worktree               | status                                    |
 | ------------------------------ | ---------------------- | ----------------------------------------- |
 | `feat/android-fcm-push`        | `~/code/t3code`        | integration branch — merge here           |
 | `feat/fcm-push`                | `~/code/t3code-fcm`    | single commit off `202e5609f`, superseded |
-| `feat/windowed-thread-loading` | `~/code/t3code-window` | single commit off `202e5609f`, superseded |
+| `feat/windowed-thread-loading` | `~/code/t3code-window` | **retired** — replaced by upstream's      |
 
-Both forks are strict subsets of the checkpoint (they differ only by explanatory
-comments that the checkpoint has and they don't). **Do not merge them into the
-integration branch** — there is nothing in them to gain, and doing so produces
-conflicts on every file both touch. They exist for reference and for opening
-upstream PRs; if you don't want them, deleting them loses nothing.
+Both forks are strict subsets of the integration branch. **Do not merge them into
+it** — there is nothing in them to gain, and doing so produces conflicts on every
+file both touch. They exist for reference; deleting them loses nothing.
 
-So "merge our two branches into upstream" is really: **merge `origin/main` into
-`feat/android-fcm-push`.** One merge.
+So the upgrade is really: **merge `origin/main` into `feat/android-fcm-push`.**
+One merge.
 
 ## Step 1 — sync upstream
 
@@ -84,13 +87,29 @@ conflicts in them almost always resolve to "keep ours _and_ theirs":
 
 - `apps/server/src/ws.ts` — handler map
 - `apps/server/src/auth/RpcAuthorization.ts` — per-RPC authorization entries
-- `assembleThreadObject` — projection field assembly
-- `apps/mobile/src/Stack.tsx`, `apps/mobile/src/features/threads/ThreadFeed.tsx`
-- `packages/contracts/src/rpc.ts` — RPC group members
+- `packages/contracts/src/rpc.ts` and `packages/contracts/src/index.ts`
+- `apps/mobile/src/Stack.tsx`
 
-**Interleaved test files.** `ProjectionSnapshotQuery.test.ts` and `server.test.ts`
-collect tests from both features and from upstream; conflicts there need the test
-cases from both sides kept side by side, not one side chosen.
+**Everything else should be upstream's.** With windowing retired, the only local
+code is the push feature. Its footprint is small and mostly in files upstream
+never touches:
+
+```
+apps/server/src/push/                     packages/contracts/src/push.ts
+apps/server/src/persistence/PushDevices*  packages/client-runtime/src/state/push.ts
+apps/server/src/persistence/Migrations/035_PushDevices.ts
+apps/server/src/cli/push.ts               apps/mobile/src/state/push.ts
+apps/mobile/src/features/agent-awareness/{notificationPermissions,notificationSetup,useAndroidPushRegistration}.ts
+docs/user/push-notifications.md
+```
+
+A conflict in a file outside that list and outside the registries above is almost
+certainly upstream-vs-upstream churn — take `origin/main`'s version
+(`git checkout origin/main -- <file>`) rather than hand-merging it.
+
+**server.test.ts** is the one file both the push feature and upstream edit
+heavily; it needs its mock of `ProjectionSnapshotQuery` to match the current
+service interface exactly, since extra keys are a type error.
 
 Sanity check after resolving:
 
