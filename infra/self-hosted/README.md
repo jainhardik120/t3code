@@ -114,9 +114,16 @@ service interface exactly, since extra keys are a type error.
 Sanity check after resolving:
 
 ```
-pnpm --filter t3 typecheck
-pnpm --filter t3 test
+vp run -r --concurrency-limit 2 typecheck                  # whole workspace
+GIT_CONFIG_GLOBAL=/dev/null vp run --filter t3 test        # server suite
 ```
+
+`GIT_CONFIG_GLOBAL=/dev/null` matters on this host: `~/.gitconfig` sets a global
+`core.hooksPath`, which overrides the per-repo hooks that `GitManager.test.ts`
+installs into its temp repos — so two hook-rejection tests fail for reasons that
+have nothing to do with your merge. Renumbering also breaks any migration test
+that hardcodes ids (`runMigrations({ toMigrationInclusive: N })`); bump those by
+the same offset as the file.
 
 ## Step 2 — release
 
