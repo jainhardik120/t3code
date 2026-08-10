@@ -90,12 +90,30 @@ while IFS= read -r d; do add_target "$d"; done < <(
     -not -path "*/node_modules/*" -prune 2>/dev/null
 )
 add_target "$REPO_ROOT/native/resource-monitor/target"   # cargo
-add_target "$REPO_ROOT/.repos"                           # pnpm sync:repos clones
+
+# Deliberately NOT cleaned: .repos looks like a cache of synced reference repos,
+# but its ~13k files are tracked in git. Deleting it leaves the worktree full of
+# pending deletions, which then blocks sync-upstream.sh's clean-tree check and
+# invites committing them by accident. Recover with `git checkout -- .repos`.
 
 if [ "$DO_MOBILE" -eq 1 ]; then
   add_target "$REPO_ROOT/apps/mobile/android"
   add_target "$REPO_ROOT/apps/mobile/ios"
 fi
+
+# Never delete anything git is tracking. Generated directories are ignored by
+# definition, so a tracked file inside a target means the target was misjudged —
+# removing it would leave pending deletions that block the next sync and could be
+# committed by accident.
+kept=()
+for t in "${targets[@]}"; do
+  if [ -n "$(git ls-files -- "$t" | head -1)" ]; then
+    warn "skipping ${t#"$REPO_ROOT"/} — it contains git-tracked files"
+    continue
+  fi
+  kept+=("$t")
+done
+targets=("${kept[@]}")
 
 [ "${#targets[@]}" -gt 0 ] || { say "Nothing to clean"; exit 0; }
 

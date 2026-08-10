@@ -204,15 +204,28 @@ directories can go:
 
 ```
 ./infra/self-hosted/cleanup.sh --dry-run   # show targets and sizes
-./infra/self-hosted/cleanup.sh             # node_modules, dist, .vite-plus, .repos, cargo target
+./infra/self-hosted/cleanup.sh             # node_modules, dist, .vite-plus, cargo target
 ./infra/self-hosted/cleanup.sh --all       # + mobile prebuild, pnpm store prune, git gc
 ```
 
 It refuses to touch anything until it has proved the service can survive without
 the repo: a complete live release, a unit whose `ExecStart` does not mention the
 repo path, a running process whose command line does not either, and a passing
-health check. Restore with `pnpm install` — which `release.sh` already runs
-first, so the next upgrade works from a cleaned tree unchanged.
+health check. It then drops any target containing git-tracked files, so a
+misjudged path can't leave the worktree full of pending deletions. (`.repos`
+looks like a sync cache but its ~13k files are committed — that guard exists
+because it got deleted once. `git checkout -- .repos` restores it.) Restore
+dependencies with `pnpm install`, which `release.sh` already runs first, so the
+next upgrade works from a cleaned tree unchanged.
+
+Measured on 2026-08-10: repo 18 GB → 824 MB, `.git` 3.7 GB → 259 MB, free space
+21 GB → 39 GB.
+
+**You can't commit from a cleaned tree.** The repo's pre-commit hook
+(`core.hooksPath=.vite-hooks/_`) runs `vp fmt`, which loads `vite-plus` from
+`node_modules`, so every commit fails with `Cannot find package 'vite-plus'`.
+Either `pnpm install` first, or use `git commit --no-verify` and accept that the
+formatter didn't run. Clean after you've finished committing, not before.
 
 Two things are worth knowing before reading the numbers:
 
