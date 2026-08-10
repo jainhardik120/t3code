@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Step 2 of the self-hosted upgrade recipe: build, package standalone, restart.
 #
-#   ./infra/self-hosted/release.sh            # full release
+#   ./infra/self-hosted/release.sh                # full release
 #   ./infra/self-hosted/release.sh --no-restart   # build + package, don't touch the service
+#   ./infra/self-hosted/release.sh --finish-release <dir>   # (internal) swap + restart only
 #
 # Produces a self-contained release under ~/.local/share/t3code/releases/<stamp>,
 # flips the `current` symlink, restarts the systemd unit, and rolls back
@@ -10,6 +11,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SELF="$REPO_ROOT/infra/self-hosted/release.sh"
 DEPLOY_ROOT="${T3_DEPLOY_ROOT:-$HOME/.local/share/t3code}"
 RELEASES_DIR="$DEPLOY_ROOT/releases"
 CURRENT_LINK="$DEPLOY_ROOT/current"
@@ -17,19 +19,90 @@ SERVICE="${T3_SERVICE:-t3code}"
 HEALTH_URL="${T3_HEALTH_URL:-http://127.0.0.1:3773/}"
 KEEP_RELEASES="${T3_KEEP_RELEASES:-3}"
 RESTART=1
+FINISH_DIR=""
 
-for arg in "$@"; do
-  case "$arg" in
+while [ $# -gt 0 ]; do
+  case "$1" in
     --no-restart) RESTART=0 ;;
-    *) echo "unknown flag: $arg" >&2; exit 2 ;;
+    --finish-release) FINISH_DIR="${2:?--finish-release needs a directory}"; shift ;;
+    *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
+  shift
 done
-
-cd "$REPO_ROOT"
 
 say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33mWARN: %s\033[0m\n' "$*" >&2; }
 die() { printf '\n\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Swap the symlink, restart, health check, roll back on failure, prune.
+#
+# Split into its own entry point because restarting the service kills every
+# process in its cgroup — including this script, when it is run from a terminal
+# or agent session hosted by t3code itself. See the dispatcher at the bottom.
+# ---------------------------------------------------------------------------
+finish_release() {
+  local release_dir="$1"
+  [ -d "$release_dir" ] || die "no such release: $release_dir"
+
+  local previous=""
+  if [ -L "$CURRENT_LINK" ]; then previous="$(readlink -f "$CURRENT_LINK")"; fi
+
+  local exec_start
+  exec_start="$(systemctl --user show "$SERVICE" -p ExecStart --value 2>/dev/null || true)"
+  case "$exec_start" in
+    *"$CURRENT_LINK"*) ;;
+    "") die "systemd unit '$SERVICE' not found — run ./infra/self-hosted/install-service.sh first" ;;
+    *) die "unit '$SERVICE' does not run from $CURRENT_LINK — run ./infra/self-hosted/install-service.sh first" ;;
+  esac
+
+  say "Pointing current -> $release_dir and restarting $SERVICE"
+  ln -sfn "$release_dir" "$CURRENT_LINK.tmp"
+  mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
+  systemctl --user restart "$SERVICE"
+
+  say "Health check"
+  local healthy=0
+  for _ in $(seq 1 30); do
+    if curl -fsS -o /dev/null --max-time 3 "$HEALTH_URL"; then healthy=1; break; fi
+    sleep 2
+  done
+
+  if [ "$healthy" -ne 1 ]; then
+    warn "health check failed against $HEALTH_URL"
+    if [ -n "$previous" ] && [ -d "$previous" ]; then
+      warn "rolling back to $previous"
+      ln -sfn "$previous" "$CURRENT_LINK.tmp"
+      mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
+      systemctl --user restart "$SERVICE"
+      sleep 3
+    fi
+    echo
+    systemctl --user status "$SERVICE" --no-pager --lines 30 || true
+    die "release failed; see 'journalctl --user -u $SERVICE -n 100'"
+  fi
+
+  say "Pruning old releases (keeping $KEEP_RELEASES)"
+  local keep_target
+  keep_target="$(readlink -f "$CURRENT_LINK")"
+  # shellcheck disable=SC2012
+  ls -1dt "$RELEASES_DIR"/*/ 2>/dev/null | tail -n +"$((KEEP_RELEASES + 1))" | while read -r old; do
+    old="${old%/}"
+    [ "$(readlink -f "$old")" = "$keep_target" ] && continue
+    echo "removing $old"
+    rm -rf "$old"
+  done
+
+  say "Live on $(basename "$release_dir")"
+  cat "$release_dir/RELEASE_INFO" 2>/dev/null || true
+}
+
+if [ -n "$FINISH_DIR" ]; then
+  finish_release "$FINISH_DIR"
+  exit 0
+fi
+
+cd "$REPO_ROOT"
 
 # --- preflight -------------------------------------------------------------
 
@@ -52,8 +125,7 @@ fi
 #
 # Run install explicitly. Never let a `pnpm run` deps-status check do it for us:
 # that path re-invokes `pnpm install --production`, which considers the dev
-# node_modules incompatible and asks to delete it — with the repo-based service
-# still running out of that directory.
+# node_modules incompatible and asks to delete it.
 
 say "Installing dependencies"
 pnpm install
@@ -95,61 +167,38 @@ node "$release_dir/dist/bin.mjs" --version
 
 if [ "$RESTART" -eq 0 ]; then
   say "Built and packaged at $release_dir (--no-restart; service untouched)"
+  echo "Finish later with: $SELF --finish-release $release_dir"
   exit 0
 fi
 
-# --- swap + restart --------------------------------------------------------
+# --- restart ---------------------------------------------------------------
+#
+# If this shell lives inside the service's own cgroup (a terminal or agent
+# session hosted by the running t3code), restarting from here would kill this
+# script mid-flight, so the health check and auto-rollback would never run. Hand
+# the last phase to a transient unit owned by the user manager instead.
 
-previous=""
-if [ -L "$CURRENT_LINK" ]; then previous="$(readlink -f "$CURRENT_LINK")"; fi
+if grep -qs "$SERVICE.service" /proc/self/cgroup; then
+  unit="t3code-release-$stamp"
+  say "This shell runs inside $SERVICE.service — handing off restart to $unit"
+  systemd-run --user --collect --unit "$unit" \
+    --description "T3 Code release $stamp" \
+    /usr/bin/env bash "$SELF" --finish-release "$release_dir"
+  cat <<EOF
 
-exec_start="$(systemctl --user show "$SERVICE" -p ExecStart --value 2>/dev/null || true)"
-case "$exec_start" in
-  *"$CURRENT_LINK"*) ;;
-  "") die "systemd unit '$SERVICE' not found — run ./infra/self-hosted/install-service.sh first" ;;
-  *) die "unit '$SERVICE' does not run from $CURRENT_LINK — run ./infra/self-hosted/install-service.sh first" ;;
-esac
+Restart is running detached; this session is about to be killed by it.
+Follow along from a shell outside the service:
 
-say "Pointing current -> $release_dir and restarting $SERVICE"
-ln -sfn "$release_dir" "$CURRENT_LINK.tmp"
-mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
-systemctl --user restart "$SERVICE"
+    journalctl --user -u $unit -f
+    systemctl --user status $SERVICE
 
-say "Health check"
-healthy=0
-for _ in $(seq 1 30); do
-  if curl -fsS -o /dev/null --max-time 3 "$HEALTH_URL"; then healthy=1; break; fi
-  sleep 2
-done
-
-if [ "$healthy" -ne 1 ]; then
-  warn "health check failed against $HEALTH_URL"
-  if [ -n "$previous" ] && [ -d "$previous" ]; then
-    warn "rolling back to $previous"
-    ln -sfn "$previous" "$CURRENT_LINK.tmp"
-    mv -Tf "$CURRENT_LINK.tmp" "$CURRENT_LINK"
-    systemctl --user restart "$SERVICE"
-    sleep 3
-  fi
-  echo
-  systemctl --user status "$SERVICE" --no-pager --lines 30 || true
-  die "release failed; see 'journalctl --user -u $SERVICE -n 100'"
+Rollback if needed: ./infra/self-hosted/rollback.sh
+EOF
+  exit 0
 fi
 
-# --- prune -----------------------------------------------------------------
+finish_release "$release_dir"
 
-say "Pruning old releases (keeping $KEEP_RELEASES)"
-keep_target="$(readlink -f "$CURRENT_LINK")"
-# shellcheck disable=SC2012
-ls -1dt "$RELEASES_DIR"/*/ 2>/dev/null | tail -n +"$((KEEP_RELEASES + 1))" | while read -r old; do
-  old="${old%/}"
-  [ "$(readlink -f "$old")" = "$keep_target" ] && continue
-  echo "removing $old"
-  rm -rf "$old"
-done
-
-say "Released $sha"
-echo "Rollback with: ./infra/self-hosted/rollback.sh"
 echo
 echo "If contracts (packages/contracts) changed, the Android APK needs a rebuild too —"
 echo "the mobile client talks the same RPC schema."

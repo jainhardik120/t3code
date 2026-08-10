@@ -108,7 +108,24 @@ pnpm --filter t3 test
    release if it fails
 7. prune to the last 3 releases
 
-`./infra/self-hosted/release.sh --no-restart` stops after step 4.
+`./infra/self-hosted/release.sh --no-restart` stops after step 4, and prints the
+`--finish-release <dir>` command to do the swap later.
+
+### Releasing from a shell hosted by t3code itself
+
+`systemctl restart` kills every process in the service's cgroup — which includes
+any terminal or agent session running _inside_ T3 Code. Releasing from there would
+kill the release script at the moment it restarts, so the health check and
+auto-rollback would never run.
+
+`release.sh` detects this (`/proc/self/cgroup` contains `t3code.service`) and hands
+steps 5–7 to a transient systemd unit owned by the user manager, then exits. The
+restart still happens, still health-checks, still rolls back on failure — but your
+session dies mid-way, so watch it from outside:
+
+```
+journalctl --user -u t3code-release-<stamp> -f
+```
 
 ### Never run `pnpm --filter t3 build`
 
