@@ -197,6 +197,31 @@ into an immutable release directory. The repo becomes a build tool again.
 `--legacy` is mandatory: the workspace doesn't set `inject-workspace-packages`, and
 pnpm ≥10 refuses to deploy without it.
 
+## Previewing a build before it replaces production
+
+To look at a change on the running machine without swapping the live server:
+
+```
+./infra/self-hosted/preview.sh              # build, launch on :3774, print a pairing link
+./infra/self-hosted/preview.sh --no-build   # reuse the newest packaged release
+./infra/self-hosted/preview.sh --pair       # another pairing link
+./infra/self-hosted/preview.sh --stop
+```
+
+It shares nothing with production: its own systemd unit (`t3code-preview`), its
+own port, and its own base dir (`~/.t3-preview`), so its database, settings and
+pairings are separate — and it refuses to start on the live port or base dir.
+Because the state dir is separate you have to pair once; the script mints the
+link for you.
+
+The `current` symlink is never touched, so the live server keeps serving the
+release it was already on. When the preview looks right, `release.sh` promotes
+the same build for real.
+
+Note it is a *second* server against the same machine: both scan the same
+provider transcript directories for usage, and both can drive agents in
+`~/code`. Don't run turns in both at once on the same worktree.
+
 ## Reclaiming disk space
 
 Once a release is live the checkout is only a build tool, so its generated
