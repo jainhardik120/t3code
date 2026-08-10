@@ -407,7 +407,12 @@ function projectLabel(projectPath: string): string {
 /** Usage per working directory, with one column per harness. */
 function ProjectBreakdown({ projects }: { readonly projects: readonly ProjectTotals[] }) {
   return (
-    <table className="w-full text-sm">
+    <table className="w-full table-fixed text-sm">
+      {/* Only the name column is sized; table-fixed splits the remainder evenly,
+      so this holds for however many harnesses PROVIDER_ORDER carries. */}
+      <colgroup>
+        <col className="w-[34%]" />
+      </colgroup>
       <thead>
         <tr className="border-b border-border text-left text-xs text-muted-foreground">
           <th className="py-2 font-normal">Project</th>
@@ -434,8 +439,8 @@ function ProjectBreakdown({ projects }: { readonly projects: readonly ProjectTot
         ) : (
           projects.map((project) => (
             <tr key={project.projectPath} className="border-b border-border/50">
-              <td className="py-2 text-foreground">
-                <span className="truncate" title={project.projectPath || "Unknown project"}>
+              <td className="py-2 pr-4 text-foreground">
+                <span className="block truncate" title={project.projectPath || "Unknown project"}>
                   {projectLabel(project.projectPath)}
                 </span>
               </td>
@@ -474,7 +479,17 @@ function SessionBreakdown({ sessions }: { readonly sessions: readonly SessionTot
 
   return (
     <div className="flex flex-col gap-2">
-      <table className="w-full text-sm">
+      {/* Fixed layout: titles are long and arbitrary, so the columns are sized
+      up front and the text truncated into them. Under auto layout the title
+      column collapses to its minimum and the numbers drift to the far edge. */}
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col className="w-[38%]" />
+          <col className="w-[22%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+          <col className="w-[14%]" />
+        </colgroup>
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
             <th className="py-2 font-normal">Session</th>
@@ -494,14 +509,14 @@ function SessionBreakdown({ sessions }: { readonly sessions: readonly SessionTot
           ) : (
             shown.map((session) => (
               <tr key={session.sessionId} className="border-b border-border/50">
-                <td className="max-w-0 py-2 text-foreground">
-                  <span className="flex items-center gap-2">
+                <td className="py-2 pr-4 text-foreground">
+                  <span className="flex min-w-0 items-center gap-2">
                     <ProviderMark provider={session.provider} className="size-3.5" />
                     <SessionLabel session={session} />
                   </span>
                 </td>
-                <td className="py-2 text-muted-foreground">
-                  <span className="truncate" title={session.projectPath || "Unknown project"}>
+                <td className="py-2 pr-4 text-muted-foreground">
+                  <span className="block truncate" title={session.projectPath || "Unknown project"}>
                     {projectLabel(session.projectPath)}
                   </span>
                 </td>
@@ -538,11 +553,20 @@ function SessionBreakdown({ sessions }: { readonly sessions: readonly SessionTot
 function SessionLabel({ session }: { readonly session: SessionTotals }) {
   const title = session.threadTitle ?? null;
   const tooltip = `${session.sessionId}\n${session.models.join(", ")}`;
+  // Every flex ancestor needs min-w-0 or truncate never engages: the row grows
+  // to fit the longest title instead of clipping it, which is what pushed the
+  // link icon out of its cell and into the next column.
+  const label =
+    title === null ? (
+      <span className="truncate font-mono text-xs">{session.sessionId.slice(0, 8)}</span>
+    ) : (
+      <span className="truncate">{title}</span>
+    );
 
   if (session.threadId === null || session.environmentId === null) {
     return (
-      <span className="truncate" title={tooltip}>
-        {title ?? <span className="font-mono text-xs">{session.sessionId.slice(0, 8)}</span>}
+      <span className="flex min-w-0 items-center" title={tooltip}>
+        {label}
       </span>
     );
   }
@@ -554,11 +578,9 @@ function SessionLabel({ session }: { readonly session: SessionTotals }) {
       target="_blank"
       rel="noreferrer"
       title={tooltip}
-      className="flex min-w-0 items-center gap-1.5 truncate text-foreground hover:underline"
+      className="flex min-w-0 items-center gap-1.5 text-foreground hover:underline"
     >
-      <span className="truncate">
-        {title ?? <span className="font-mono text-xs">{session.sessionId.slice(0, 8)}</span>}
-      </span>
+      {label}
       <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
     </Link>
   );
