@@ -197,6 +197,41 @@ into an immutable release directory. The repo becomes a build tool again.
 `--legacy` is mandatory: the workspace doesn't set `inject-workspace-packages`, and
 pnpm ≥10 refuses to deploy without it.
 
+## Reclaiming disk space
+
+Once a release is live the checkout is only a build tool, so its generated
+directories can go:
+
+```
+./infra/self-hosted/cleanup.sh --dry-run   # show targets and sizes
+./infra/self-hosted/cleanup.sh             # node_modules, dist, .vite-plus, .repos, cargo target
+./infra/self-hosted/cleanup.sh --all       # + mobile prebuild, pnpm store prune, git gc
+```
+
+It refuses to touch anything until it has proved the service can survive without
+the repo: a complete live release, a unit whose `ExecStart` does not mention the
+repo path, a running process whose command line does not either, and a passing
+health check. Restore with `pnpm install` — which `release.sh` already runs
+first, so the next upgrade works from a cleaned tree unchanged.
+
+Two things are worth knowing before reading the numbers:
+
+**`node_modules` is mostly hardlinks.** pnpm links from the store rather than
+copying, so deleting 11 GB of `node_modules` frees far less than 11 GB — the
+inodes stay alive in `~/.local/share/pnpm/store` (16 GB here). `--store` runs
+`pnpm store prune`, which is what actually returns those bytes. The store is
+shared with every pnpm project on the machine, but prune only drops packages
+nothing references any more, so other checkouts are unaffected; the cost is
+re-downloading on the next install.
+
+**`--mobile` deletes a keystore you cannot regenerate.** `apps/mobile/android`
+is gitignored and rebuilt by `expo prebuild`, but `android/app/debug.keystore`
+is minted randomly each time. The installed APK is signed with the current one,
+and Android refuses an update signed by a different key — so losing it forces an
+uninstall, taking app data and pairing with it. The script copies it to
+`~/.local/share/t3code/mobile/debug.keystore` first and prints the restore
+command; put it back before the next APK build.
+
 ## Rollback
 
 ```
