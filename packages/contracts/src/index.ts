@@ -30,4 +30,5 @@ export * from "./previewAutomation.ts";
 export * from "./push.ts";
 export * from "./resourceTelemetry.ts";
 export * from "./usage.ts";
+export * from "./chatgpt.ts";
 export * from "./rpc.ts";

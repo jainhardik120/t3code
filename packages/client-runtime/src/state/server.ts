@@ -1,4 +1,6 @@
 import {
+  type ChatGptSendEvent,
+  type ChatGptSendInput,
   type EnvironmentId,
   type ServerConfig,
   type ServerConfigStreamEvent,
@@ -27,6 +29,8 @@ import {
   createEnvironmentRpcQueryAtomFamily,
   createEnvironmentRpcSubscriptionAtomFamily,
   createRuntimeCommand,
+  createRuntimeStreamCommand,
+  runStreamInEnvironment,
   scheduleAtomCommandEffect,
 } from "./runtime.ts";
 import { EnvironmentRegistry } from "../connection/registry.ts";
@@ -720,6 +724,48 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:thread-usage-cost",
       tag: WS_METHODS.serverGetThreadUsageCost,
       staleTimeMs: 15_000,
+    }),
+    // ChatGPT connector (installed separately on the host). The overview refreshes
+    // often enough to reflect an in-progress background sync.
+    chatgptOverview: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:chatgpt-overview",
+      tag: WS_METHODS.chatgptGetOverview,
+      staleTimeMs: 5_000,
+    }),
+    chatgptConversations: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:chatgpt-conversations",
+      tag: WS_METHODS.chatgptListConversations,
+      staleTimeMs: 30_000,
+    }),
+    chatgptConversation: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:chatgpt-conversation",
+      tag: WS_METHODS.chatgptGetConversation,
+      staleTimeMs: 60_000,
+    }),
+    chatgptSearch: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:chatgpt-search",
+      tag: WS_METHODS.chatgptSearch,
+      staleTimeMs: 10_000,
+    }),
+    // Streaming send: runs the send stream once per invocation and forwards each
+    // event to a caller-supplied `onEvent` (client-side only) so the composer can
+    // render the reply as it generates. One-shot (no auto-resubscribe) — safe for a
+    // non-idempotent action. `run` resolves with the final (done) event.
+    chatgptSend: createRuntimeStreamCommand(runtime, {
+      label: "environment-data:server:chatgpt-send",
+      execute: (
+        input: {
+          readonly environmentId: EnvironmentId;
+          readonly input: ChatGptSendInput;
+          readonly onEvent: (event: ChatGptSendEvent) => void;
+        },
+      ) =>
+        runStreamInEnvironment(
+          input.environmentId,
+          runStream(WS_METHODS.chatgptSend, input.input).pipe(
+            Stream.tap((event) => Effect.sync(() => input.onEvent(event))),
+          ),
+        ),
     }),
     configProjection,
     welcome: createEnvironmentRpcSubscriptionAtomFamily(runtime, {

@@ -166,6 +166,18 @@ import {
   UsageSummary,
   UsageSummaryInput,
 } from "./usage.ts";
+import {
+  ChatGptConnectorError,
+  ChatGptConversationDetail,
+  ChatGptConversationPage,
+  ChatGptGetConversationInput,
+  ChatGptListConversationsInput,
+  ChatGptOverview,
+  ChatGptSearchInput,
+  ChatGptSearchResults,
+  ChatGptSendEvent,
+  ChatGptSendInput,
+} from "./chatgpt.ts";
 import { ServerSettings, ServerSettingsError, ServerSettingsPatch } from "./settings.ts";
 import {
   SourceControlCloneRepositoryInput,
@@ -285,6 +297,11 @@ export const WS_METHODS = {
   subscribeAuthAccess: "subscribeAuthAccess",
   subscribeBackgroundPolicy: "subscribeBackgroundPolicy",
   subscribeResourceTelemetry: "subscribeResourceTelemetry",
+  chatgptGetOverview: "chatgpt.getOverview",
+  chatgptListConversations: "chatgpt.listConversations",
+  chatgptGetConversation: "chatgpt.getConversation",
+  chatgptSearch: "chatgpt.search",
+  chatgptSend: "chatgpt.send",
 } as const;
 
 export const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -412,6 +429,37 @@ export const WsServerGetThreadUsageCostRpc = Rpc.make(WS_METHODS.serverGetThread
   payload: ThreadUsageCostInput,
   success: Schema.NullOr(ThreadUsageCost),
   error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
+});
+
+/** ChatGPT connector: accounts + sync status in one call for the landing view. */
+export const WsChatgptGetOverviewRpc = Rpc.make(WS_METHODS.chatgptGetOverview, {
+  success: ChatGptOverview,
+  error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
+});
+
+export const WsChatgptListConversationsRpc = Rpc.make(WS_METHODS.chatgptListConversations, {
+  payload: ChatGptListConversationsInput,
+  success: ChatGptConversationPage,
+  error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
+});
+
+export const WsChatgptGetConversationRpc = Rpc.make(WS_METHODS.chatgptGetConversation, {
+  payload: ChatGptGetConversationInput,
+  success: ChatGptConversationDetail,
+  error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
+});
+
+export const WsChatgptSearchRpc = Rpc.make(WS_METHODS.chatgptSearch, {
+  payload: ChatGptSearchInput,
+  success: ChatGptSearchResults,
+  error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
+});
+
+export const WsChatgptSendRpc = Rpc.make(WS_METHODS.chatgptSend, {
+  payload: ChatGptSendInput,
+  success: ChatGptSendEvent,
+  error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
+  stream: true,
 });
 
 export const WsServerSignalProcessRpc = Rpc.make(WS_METHODS.serverSignalProcess, {
@@ -933,4 +981,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationGetArchivedShellSnapshotRpc,
   WsOrchestrationSubscribeShellRpc,
   WsOrchestrationSubscribeThreadRpc,
+  WsChatgptGetOverviewRpc,
+  WsChatgptListConversationsRpc,
+  WsChatgptGetConversationRpc,
+  WsChatgptSearchRpc,
+  WsChatgptSendRpc,
 );

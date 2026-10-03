@@ -109,6 +109,13 @@ import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts
 import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as UsageService from "./usage/UsageService.ts";
 import {
+  chatgptGetConversation,
+  chatgptGetOverview,
+  chatgptListConversations,
+  chatgptSearch,
+  chatgptSend,
+} from "./chatgpt/handlers.ts";
+import {
   attachSessionLinks,
   buildSessionLinks,
   resumeSessionId,
@@ -1613,6 +1620,26 @@ const makeWsRpcLayer = (
           }),
         [WS_METHODS.serverGetThreadUsageCost]: (input) =>
           observeRpcEffect(WS_METHODS.serverGetThreadUsageCost, readThreadUsageCost(input), {
+            "rpc.aggregate": "server",
+          }),
+        [WS_METHODS.chatgptGetOverview]: (_input) =>
+          observeRpcEffect(WS_METHODS.chatgptGetOverview, chatgptGetOverview, {
+            "rpc.aggregate": "server",
+          }),
+        [WS_METHODS.chatgptListConversations]: (input) =>
+          observeRpcEffect(WS_METHODS.chatgptListConversations, chatgptListConversations(input), {
+            "rpc.aggregate": "server",
+          }),
+        [WS_METHODS.chatgptGetConversation]: (input) =>
+          observeRpcEffect(WS_METHODS.chatgptGetConversation, chatgptGetConversation(input), {
+            "rpc.aggregate": "server",
+          }),
+        [WS_METHODS.chatgptSearch]: (input) =>
+          observeRpcEffect(WS_METHODS.chatgptSearch, chatgptSearch(input), {
+            "rpc.aggregate": "server",
+          }),
+        [WS_METHODS.chatgptSend]: (input) =>
+          observeRpcStream(WS_METHODS.chatgptSend, chatgptSend(input), {
             "rpc.aggregate": "server",
           }),
         [WS_METHODS.serverRetryResourceTelemetry]: (_input) =>
