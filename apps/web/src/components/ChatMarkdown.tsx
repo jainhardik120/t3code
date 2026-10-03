@@ -75,6 +75,7 @@ import {
   type MarkdownFileLinkMeta,
 } from "../markdown-links";
 import { readLocalApi } from "../localApi";
+import { fileServerHref } from "../fileServerLink";
 import { cn } from "../lib/utils";
 import { useRightPanelStore } from "../rightPanelStore";
 import { useActiveEnvironmentId } from "../state/entities";
@@ -734,6 +735,8 @@ function UncachedShikiCodeBlock({
 
 interface MarkdownFileLinkProps {
   href: string;
+  /** Same-origin file-server URL, or null when the file cannot be served. */
+  fileHref: string | null;
   targetPath: string;
   iconPath: string;
   displayPath: string;
@@ -1017,6 +1020,7 @@ function MarkdownExternalLinkContent({
 
 const MarkdownFileLink = memo(function MarkdownFileLink({
   href,
+  fileHref,
   targetPath,
   iconPath,
   displayPath,
@@ -1065,6 +1069,9 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
     })();
   }, [onOpen, targetPath]);
 
+  /** True when T3 itself can show the file, so a new tab would be a downgrade. */
+  const canPreviewInApp = Boolean(threadRef && workspaceRelativePath);
+
   const handleOpenInFilePreview = useCallback(() => {
     if (!threadRef || !workspaceRelativePath) {
       handleOpenInEditor();
@@ -1072,6 +1079,11 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
     }
     useRightPanelStore.getState().openFile(threadRef, workspaceRelativePath, line);
   }, [handleOpenInEditor, line, threadRef, workspaceRelativePath]);
+
+  const handleOpenInNewTab = useCallback(() => {
+    if (!fileHref) return;
+    window.open(fileHref, "_blank", "noopener,noreferrer");
+  }, [fileHref]);
 
   const handleOpenInBrowser = useCallback(() => {
     if (!onOpenInBrowser) {
@@ -1165,6 +1177,7 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
             ...(onOpenInBrowser
               ? ([{ id: "open-in-browser", label: "Open in integrated browser" }] as const)
               : []),
+            ...(fileHref ? ([{ id: "open-in-new-tab", label: "Open in new tab" }] as const) : []),
             { id: "copy-relative", label: "Copy relative path" },
             { id: "copy-full", label: "Copy full path" },
           ] as const,
@@ -1177,6 +1190,10 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         }
         if (clicked === "open-in-browser") {
           handleOpenInBrowser();
+          return;
+        }
+        if (clicked === "open-in-new-tab") {
+          handleOpenInNewTab();
           return;
         }
         if (clicked === "copy-relative") {
@@ -1193,7 +1210,16 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
         );
       }
     },
-    [displayPath, handleCopy, handleOpenInBrowser, handleOpenInEditor, onOpenInBrowser, targetPath],
+    [
+      displayPath,
+      fileHref,
+      handleCopy,
+      handleOpenInBrowser,
+      handleOpenInEditor,
+      handleOpenInNewTab,
+      onOpenInBrowser,
+      targetPath,
+    ],
   );
 
   return (
@@ -1201,17 +1227,32 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
       <TooltipTrigger
         render={
           <a
-            href={href}
+            // A real file-server URL keeps the status bar honest and makes
+            // middle-click and cmd-click work the way they look like they should.
+            href={fileHref ?? href}
+            {...(fileHref ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             className={cn(CHAT_FILE_TAG_CHIP_CLASS_NAME, MARKDOWN_FILE_LINK_CLASS_NAME, className)}
             data-markdown-copy={copyMarkdown}
             onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
+              // Let the browser own modified clicks so "open in new tab" and
+              // "copy link address" behave natively.
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
               if (onOpenInBrowser) {
+                event.preventDefault();
+                event.stopPropagation();
                 handleOpenInBrowser();
                 return;
               }
-              handleOpenInFilePreview();
+              if (canPreviewInApp || !fileHref) {
+                event.preventDefault();
+                event.stopPropagation();
+                handleOpenInFilePreview();
+                return;
+              }
+              // Nothing in-app can show this file -- opening it in the editor
+              // would only do something on the machine running the server, so
+              // follow the href and serve it to whoever actually clicked.
+              event.stopPropagation();
             }}
             onContextMenu={handleContextMenu}
           >
@@ -1237,6 +1278,7 @@ function areMarkdownFileLinkPropsEqual(
 ): boolean {
   return (
     previous.href === next.href &&
+    previous.fileHref === next.fileHref &&
     previous.targetPath === next.targetPath &&
     previous.iconPath === next.iconPath &&
     previous.displayPath === next.displayPath &&
@@ -1390,6 +1432,7 @@ function ChatMarkdown({
       return (
         <MarkdownFileLink
           href={fileLinkMeta.targetPath}
+          fileHref={fileServerHref(fileLinkMeta.filePath)}
           targetPath={fileLinkMeta.targetPath}
           iconPath={fileLinkMeta.filePath}
           displayPath={fileLinkMeta.displayPath}
