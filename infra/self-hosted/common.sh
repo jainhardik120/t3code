@@ -54,10 +54,21 @@ EOF
 
 # --- release plumbing ------------------------------------------------------
 
+# node-pty resolves its native binding from build/Release, then build/Debug,
+# then prebuilds/<platform>-<arch> (lib/utils.js). It stopped compiling into
+# build/Release at 1.2.0-beta and now ships prebuilds, so accept either -- this
+# guard checking only the old path failed a release whose binding was fine.
+node_pty_binding_present() {
+  local modules="$1/node_modules/node-pty"
+  [ -f "$modules/build/Release/pty.node" ] ||
+    [ -f "$modules/build/Debug/pty.node" ] ||
+    [ -f "$modules/prebuilds/$(uname -s | tr '[:upper:]' '[:lower:]')-$(node -p 'process.arch')/pty.node" ]
+}
+
 release_is_complete() {
   local dir="$1"
   [ -f "$dir/dist/bin.mjs" ] && [ -f "$dir/dist/client/index.html" ] &&
-    [ -f "$dir/node_modules/node-pty/build/Release/pty.node" ]
+    node_pty_binding_present "$dir"
 }
 
 current_release() { readlink -f "$CURRENT_LINK" 2>/dev/null || true; }
