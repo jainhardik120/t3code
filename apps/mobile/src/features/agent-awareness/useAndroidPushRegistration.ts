@@ -27,7 +27,7 @@ export function useAndroidPushRegistration(): void {
       return;
     }
     const connected = environments
-      .map(projectWorkspaceEnvironment)
+      .map((environment) => projectWorkspaceEnvironment(environment.environmentId, environment))
       .filter((environment) => environment.connectionState === "connected");
     if (connected.length === 0) {
       return;

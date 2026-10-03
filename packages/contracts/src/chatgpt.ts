@@ -143,7 +143,7 @@ export const ChatGptSearchResults = Schema.Struct({
 });
 export type ChatGptSearchResults = typeof ChatGptSearchResults.Type;
 
-export class ChatGptConnectorError extends Schema.TaggedErrorClass<ChatGptConnectorError>()(
+export class ChatGptConnectorError extends Schema.TaggedError<ChatGptConnectorError>()(
   "ChatGptConnectorError",
   {
     /** `unavailable` - the daemon isn't reachable; `failed` - it errored. */

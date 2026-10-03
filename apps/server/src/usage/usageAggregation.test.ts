@@ -12,6 +12,13 @@ const rates: RateTable = new Map([
       outputCostPerToken: 5e-5,
       cacheReadCostPerToken: 1e-6,
       cacheCreationCostPerToken: 1.25e-5,
+      fast: {
+        inputCostPerToken: 2e-5,
+        outputCostPerToken: 1e-4,
+        cacheReadCostPerToken: 2e-6,
+        cacheCreationCostPerToken: 2.5e-5,
+      },
+      ultrafast: null,
     },
   ],
 ]);
@@ -32,16 +39,30 @@ function record(overrides: Partial<UsageRecord> = {}): UsageRecord {
       reasoningTokens: 0,
     },
     reportedCostUsd: null,
+    speed: "standard",
     dedupeKey: null,
     ...overrides,
   };
 }
 
-function aggregate(records: readonly UsageRecord[], timeZone = "UTC") {
+function aggregate(
+  records: readonly UsageRecord[],
+  timeZone = "UTC",
+  resolution: "day" | "hour" = "day",
+) {
+  const hourlyBounds =
+    resolution === "hour"
+      ? {
+          sinceTimeMs: Date.parse("2026-08-06T04:37:00.000Z"),
+          untilTimeMs: Date.parse("2026-08-07T04:37:00.000Z"),
+        }
+      : {};
   const aggregator = new UsageAggregator({
     timeZone,
     sinceDay: "2026-08-01",
     untilDay: "2026-08-31",
+    resolution,
+    ...hourlyBounds,
     rates,
   });
   for (const item of records) aggregator.add(item);
@@ -49,6 +70,37 @@ function aggregate(records: readonly UsageRecord[], timeZone = "UTC") {
 }
 
 describe("UsageAggregator", () => {
+  it("requires exact bounds for hourly aggregation", () => {
+    expect(
+      () =>
+        new UsageAggregator({
+          timeZone: "UTC",
+          sinceDay: "2026-08-01",
+          untilDay: "2026-08-31",
+          resolution: "hour",
+          rates,
+        }),
+    ).toThrow("requires exact time bounds");
+  });
+
+  it("splits a bucket's cost by category and speed", () => {
+    const [bucket] = aggregate([record(), record({ speed: "fast" })]).buckets;
+
+    // Standard costs $0.005625 and fast twice that.
+    expect(bucket).toMatchObject({
+      costUsd: expect.closeTo(0.016875),
+      categoryCostUsd: {
+        input: expect.closeTo(0.003),
+        cacheRead: expect.closeTo(0.003),
+        cacheWrite: expect.closeTo(0.000375),
+        output: expect.closeTo(0.0075),
+      },
+      fastCostUsd: expect.closeTo(0.01125),
+      speedPremiumUsd: expect.closeTo(0.005625),
+    });
+    expect(bucket).not.toHaveProperty("ultrafastCostUsd");
+  });
+
   it("keeps only the first record for a repeated dedupe key", () => {
     const result = aggregate([
       record({ dedupeKey: "msg_1:" }),
@@ -75,6 +127,52 @@ describe("UsageAggregator", () => {
 
     expect(utc.buckets[0]?.day).toBe("2026-08-07");
     expect(losAngeles.buckets[0]?.day).toBe("2026-08-06");
+  });
+
+  it("splits an hourly request into fixed buckets anchored to its exact start", () => {
+    const result = aggregate(
+      [
+        record({ timestampMs: Date.parse("2026-08-07T02:40:13.944Z") }),
+        record({ timestampMs: Date.parse("2026-08-07T03:40:13.944Z") }),
+      ],
+      "America/Los_Angeles",
+      "hour",
+    );
+
+    expect(result.buckets.map((bucket) => [bucket.day, bucket.hourStart])).toEqual([
+      ["2026-08-06", "2026-08-07T02:37:00.000Z"],
+      ["2026-08-06", "2026-08-07T03:37:00.000Z"],
+    ]);
+  });
+
+  it("uses an inclusive start and exclusive end for rolling windows", () => {
+    const result = aggregate(
+      [
+        record({ timestampMs: Date.parse("2026-08-06T04:36:59.999Z") }),
+        record({ timestampMs: Date.parse("2026-08-06T04:37:00.000Z") }),
+        record({ timestampMs: Date.parse("2026-08-07T04:36:59.999Z") }),
+        record({ timestampMs: Date.parse("2026-08-07T04:37:00.000Z") }),
+      ],
+      "UTC",
+      "hour",
+    );
+
+    expect(result.outOfWindow).toBe(2);
+    expect(result.buckets.map((bucket) => bucket.hourStart)).toEqual([
+      "2026-08-06T04:37:00.000Z",
+      "2026-08-07T03:37:00.000Z",
+    ]);
+  });
+
+  it("keeps daily payloads collapsed when hourly resolution is not requested", () => {
+    const result = aggregate([
+      record({ timestampMs: Date.parse("2026-08-07T04:05:13.944Z") }),
+      record({ timestampMs: Date.parse("2026-08-07T05:05:13.944Z") }),
+    ]);
+
+    expect(result.buckets).toHaveLength(1);
+    expect(result.buckets[0]?.hourStart).toBeUndefined();
+    expect(result.buckets[0]?.records).toBe(2);
   });
 
   it("prices against the rate table", () => {

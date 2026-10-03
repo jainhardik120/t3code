@@ -1,6 +1,6 @@
-import type { ThreadId } from "@t3tools/contracts";
+import type { OrchestrationV2ThreadShell, Project, ThreadId } from "@t3tools/contracts";
 import type { AgentAwarenessPhase } from "@t3tools/shared/agentAwareness";
-import { projectThreadAwareness } from "@t3tools/shared/agentAwareness";
+import { projectThreadAwarenessV2 } from "@t3tools/shared/agentAwareness";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -15,10 +15,10 @@ import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
-import * as OrchestrationEngine from "../orchestration/Services/OrchestrationEngine.ts";
-import * as ProjectionSnapshotQuery from "../orchestration/Services/ProjectionSnapshotQuery.ts";
+import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
+import * as ProjectService from "../project/ProjectService.ts";
 import * as PushDevices from "../persistence/PushDevices.ts";
-import { eventThreadId, shouldPublishAgentAwarenessEvent } from "../relay/AgentAwarenessRelay.ts";
+import { shouldPublishAgentAwarenessEvent } from "../relay/AgentAwarenessRelay.ts";
 import { FCM_SERVICE_ACCOUNT_SECRET, PUSH_ANDROID_CHANNEL_ID } from "./config.ts";
 import {
   type FcmAccessToken,
@@ -69,8 +69,8 @@ function isActivePhase(phase: AgentAwarenessPhase): boolean {
 export const make = Effect.gen(function* () {
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
-  const snapshotQuery = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
-  const orchestrationEngine = yield* OrchestrationEngine.OrchestrationEngineService;
+  const threads = yield* ThreadManagement.ThreadManagementService;
+  const projects = yield* ProjectService.ProjectService;
   const pushDevices = yield* PushDevices.PushDeviceRepository;
 
   // Last phase we observed per thread, so we only notify on transitions rather
@@ -163,13 +163,17 @@ export const make = Effect.gen(function* () {
       return;
     }
     const environmentId = yield* serverEnvironment.getEnvironmentId;
-    const thread = yield* snapshotQuery.getThreadShellById(threadId);
+    const threadShell = yield* threads.getThreadShell(threadId);
+    const thread =
+      threadShell === null || threadShell.archivedAt !== null
+        ? Option.none<OrchestrationV2ThreadShell>()
+        : Option.some(threadShell);
     const project = Option.isSome(thread)
-      ? yield* snapshotQuery.getProjectShellById(thread.value.projectId)
-      : Option.none<never>();
+      ? yield* projects.getById(thread.value.projectId)
+      : Option.none<Project>();
     const state =
       Option.isSome(thread) && Option.isSome(project)
-        ? projectThreadAwareness({
+        ? projectThreadAwarenessV2({
             environmentId,
             project: project.value,
             thread: thread.value,
@@ -251,12 +255,11 @@ export const make = Effect.gen(function* () {
         : "self-hosted push notifications standby; no FCM service account configured",
     );
     yield* Effect.forkScoped(
-      Stream.runForEach(orchestrationEngine.streamDomainEvents, (event) => {
-        const threadId = eventThreadId(event);
-        if (threadId === null || !shouldPublishAgentAwarenessEvent(event)) {
+      Stream.runForEach(threads.streamDomainEvents, (event) => {
+        if (!shouldPublishAgentAwarenessEvent(event)) {
           return Effect.void;
         }
-        return worker.enqueue(threadId);
+        return worker.enqueue(event.threadId);
       }),
     );
   });

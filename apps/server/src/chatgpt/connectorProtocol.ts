@@ -16,7 +16,7 @@ import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 /** The protocol version T3 speaks; checked against the daemon's `ping`. */
 export const EXPECTED_CONNECTOR_PROTOCOL = 1;
 
-export class ConnectorSearchError extends Schema.TaggedErrorClass<ConnectorSearchError>()(
+export class ConnectorSearchError extends Schema.TaggedError<ConnectorSearchError>()(
   "SearchError",
   {
     reason: Schema.Literals(["embed", "query", "rerank"]),
@@ -25,7 +25,7 @@ export class ConnectorSearchError extends Schema.TaggedErrorClass<ConnectorSearc
   },
 ) {}
 
-export class ConnectorStoreError extends Schema.TaggedErrorClass<ConnectorStoreError>()(
+export class ConnectorStoreError extends Schema.TaggedError<ConnectorStoreError>()(
   "StoreError",
   { detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
 ) {}
@@ -116,12 +116,12 @@ export const ConnectorConversationDetail = Schema.Struct({
 });
 export type ConnectorConversationDetail = typeof ConnectorConversationDetail.Type;
 
-export class ConnectorAccountNotFoundError extends Schema.TaggedErrorClass<ConnectorAccountNotFoundError>()(
+export class ConnectorAccountNotFoundError extends Schema.TaggedError<ConnectorAccountNotFoundError>()(
   "AccountNotFoundError",
   { accountId: Schema.String },
 ) {}
 
-export class ConnectorSendError extends Schema.TaggedErrorClass<ConnectorSendError>()("SendError", {
+export class ConnectorSendError extends Schema.TaggedError<ConnectorSendError>()("SendError", {
   accountId: Schema.String,
   reason: Schema.Literals(["auth", "send", "store"]),
   detail: Schema.String,

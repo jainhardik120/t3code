@@ -2,8 +2,15 @@ import type { ThreadUsageCost } from "@t3tools/contracts";
 import { formatUsd } from "@t3tools/shared/usageFormat";
 
 import { cn } from "~/lib/utils";
+import { Button } from "../ui/button";
 import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import {
+  formatContextWindowCompactionMessage,
+  formatContextWindowCost,
+} from "./ContextWindowMeter.logic";
+import { Minimize2Icon } from "lucide-react";
+import { composerFloatingLayerProps } from "./composerEventScope";
 
 function formatPercentage(value: number | null): string | null {
   if (value === null || !Number.isFinite(value)) {
@@ -17,7 +24,10 @@ function formatPercentage(value: number | null): string | null {
 
 export function ContextWindowMeter(props: {
   usage: ContextWindowSnapshot;
-  providerDisplayName?: string | null;
+  modelDisplayName?: string | null;
+  onCompact?: (() => void) | undefined;
+  compactDisabled?: boolean | undefined;
+  compactDisabledReason?: string | null | undefined;
   /**
    * Cost of this thread's provider session, priced from its transcript by the
    * same code as the usage page. Null while it loads, or when the session has
@@ -25,7 +35,14 @@ export function ContextWindowMeter(props: {
    */
   sessionCost?: ThreadUsageCost | null;
 }) {
-  const { usage, providerDisplayName, sessionCost = null } = props;
+  const {
+    usage,
+    modelDisplayName,
+    onCompact,
+    compactDisabled,
+    compactDisabledReason,
+    sessionCost = null,
+  } = props;
   const usedPercentage = formatPercentage(usage.usedPercentage);
   const normalizedPercentage = Math.max(0, Math.min(100, usage.usedPercentage ?? 0));
   const radius = 9.75;
@@ -43,15 +60,12 @@ export function ContextWindowMeter(props: {
       <PopoverTrigger
         openOnHover
         delay={150}
-        closeDelay={0}
+        closeDelay={onCompact ? 150 : 0}
         render={
-          <button
-            type="button"
-            className={cn(
-              "inline-flex size-7 cursor-pointer items-center justify-center rounded-full border border-transparent text-muted-foreground outline-none transition-colors",
-              "hover:bg-accent data-[pressed]:bg-accent",
-              "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
-            )}
+          <Button
+            size="icon-sm"
+            variant="ghost-muted"
+            className="size-7"
             aria-label={
               usage.maxTokens !== null && usedPercentage
                 ? `Context window ${usedPercentage} used`
@@ -61,7 +75,7 @@ export function ContextWindowMeter(props: {
             <span className="relative flex size-5 items-center justify-center">
               <svg
                 viewBox="0 0 24 24"
-                className="-rotate-90 absolute inset-0 size-full transform-gpu"
+                className="-rotate-90 absolute inset-0 size-full transform-gpu mx-0!"
                 aria-hidden="true"
               >
                 <circle
@@ -69,7 +83,7 @@ export function ContextWindowMeter(props: {
                   cy="12"
                   r={radius}
                   fill="none"
-                  stroke="color-mix(in oklab, var(--color-muted-foreground) 24%, transparent)"
+                  className="stroke-muted-foreground/24"
                   strokeWidth="3"
                 />
                 <circle
@@ -86,21 +100,23 @@ export function ContextWindowMeter(props: {
                 />
               </svg>
             </span>
-          </button>
+          </Button>
         }
       />
       <PopoverPopup
+        {...composerFloatingLayerProps}
         tooltipStyle
         side="top"
         align="end"
-        viewportClassName="p-0"
-        className="w-64 max-w-none text-left whitespace-normal"
+        padding="none"
+        width="sm"
+        className="text-left whitespace-normal"
       >
-        <div className="flex flex-col gap-2 p-[var(--floating-content-inset)]">
+        <div className="flex flex-col gap-2 p-(--floating-content-inset)">
           <div className="flex items-center justify-between gap-3">
             <div className="font-medium text-muted-foreground text-xs">Context Window</div>
             {usage.maxTokens !== null && usedPercentage ? (
-              <div className="text-secondary-label text-[11px] tabular-nums">
+              <div className="text-secondary-label text-2xs tabular-nums">
                 <span>{usedPercentage}</span>
                 <span className="mx-1">·</span>
                 <span>
@@ -109,7 +125,7 @@ export function ContextWindowMeter(props: {
                 </span>
               </div>
             ) : (
-              <div className="text-secondary-label text-[11px] tabular-nums">
+              <div className="text-secondary-label text-2xs tabular-nums">
                 {formatContextWindowTokens(usage.usedTokens)}
               </div>
             )}
@@ -130,36 +146,73 @@ export function ContextWindowMeter(props: {
             </div>
           ) : null}
           {showTotalProcessed ? (
-            <div className="flex items-center justify-between gap-3 text-[11px] leading-4">
+            <div className="flex items-center justify-between gap-3 text-2xs leading-4">
               <span className="text-secondary-label">Total processed</span>
               <span className="font-medium tabular-nums text-secondary-label">
                 {formatContextWindowTokens(totalProcessedTokens)}
               </span>
             </div>
           ) : null}
-          {sessionCost !== null && sessionCost.costSource !== "unpriced" ? (
-            <div className="flex items-center justify-between gap-3 text-[11px] leading-4">
-              <span className="text-secondary-label">Session cost</span>
+          {/* The provider's own number when it reports one; otherwise the
+              transcript-priced estimate, which is always available and agrees
+              with the usage page. Never both: two cost rows that can disagree
+              read as a discrepancy rather than as one figure. */}
+          {usage.cost != null ? (
+            <div className="flex items-center justify-between gap-3 text-2xs leading-4">
+              <span className="text-secondary-label">Cost</span>
               <span className="font-medium tabular-nums text-secondary-label">
-                {formatUsd(sessionCost.costUsd)}
-                {/* Say so when the figure is an estimate rather than the
-                    provider's own number, so it is not read as a bill. */}
-                {sessionCost.costSource === "modelPriced" ? "*" : ""}
+                {formatContextWindowCost(usage.cost)}
               </span>
             </div>
-          ) : null}
-          {sessionCost !== null && sessionCost.costSource === "modelPriced" ? (
-            <div className="text-secondary-label text-[10px] leading-3">
-              * estimated at full API rates
-            </div>
+          ) : sessionCost !== null && sessionCost.costSource !== "unpriced" ? (
+            <>
+              <div className="flex items-center justify-between gap-3 text-2xs leading-4">
+                <span className="text-secondary-label">Session cost</span>
+                <span className="font-medium tabular-nums text-secondary-label">
+                  {formatUsd(sessionCost.costUsd)}
+                  {/* Say so when the figure is an estimate rather than the
+                      provider's own number, so it is not read as a bill. */}
+                  {sessionCost.costSource === "modelPriced" ? "*" : ""}
+                </span>
+              </div>
+              {sessionCost.costSource === "modelPriced" ? (
+                <div className="text-secondary-label text-2xs leading-3">
+                  * estimated at full API rates
+                </div>
+              ) : null}
+            </>
           ) : null}
           {usage.compactsAutomatically ? (
-            <div className="mt-1 text-pretty text-secondary-label text-[11px] font-medium">
-              {providerDisplayName ?? "It"} automatically compacts its context when needed.
+            <div className="mt-1 text-pretty text-secondary-label text-2xs font-medium">
+              {formatContextWindowCompactionMessage(modelDisplayName, usage.autoCompactThreshold)}
             </div>
+          ) : null}
+          {onCompact ? (
+            <>
+              <Button
+                size="xs"
+                variant="outline"
+                className="mt-1 w-full justify-center"
+                disabled={compactDisabled}
+                onClick={onCompact}
+              >
+                <Minimize2Icon aria-hidden="true" />
+                Compact context
+              </Button>
+              {compactDisabled && compactDisabledReason ? (
+                <div className="text-pretty text-secondary-label text-2xs">
+                  {compactDisabledReason}
+                </div>
+              ) : null}
+            </>
           ) : null}
         </div>
       </PopoverPopup>
     </Popover>
   );
+}
+
+/** Holds the meter's footprint while a thread's activities are still loading. */
+export function ContextWindowMeterPlaceholder() {
+  return <span aria-hidden="true" className="size-7 shrink-0" />;
 }

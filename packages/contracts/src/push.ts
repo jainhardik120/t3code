@@ -50,7 +50,7 @@ export const PushUnregisterTokenResult = Schema.Struct({
 });
 export type PushUnregisterTokenResult = typeof PushUnregisterTokenResult.Type;
 
-export class PushRegistrationError extends Schema.TaggedErrorClass<PushRegistrationError>()(
+export class PushRegistrationError extends Schema.TaggedError<PushRegistrationError>()(
   "PushRegistrationError",
   {
     message: Schema.String,

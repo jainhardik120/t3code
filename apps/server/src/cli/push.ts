@@ -17,7 +17,7 @@ class PushCliError extends Data.TaggedError("PushCliError")<{ readonly message: 
 
 const setFcmCredentialsCommand = Command.make("set-fcm-credentials", {
   ...authLocationFlags,
-  path: Argument.string("path").pipe(
+  path: Argument.String("path").pipe(
     Argument.withDescription(
       "Path to a Google service-account JSON file (with the Firebase Cloud Messaging API enabled).",
     ),
