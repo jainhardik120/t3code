@@ -1,0 +1,215 @@
+/* Follows Astra Monitor / Battmon so the panel reads as one family. */
+.t3mon-header {
+  padding: 0;
+  margin: 0;
+}
+.t3mon-header-box {
+  padding: 0 2px;
+  spacing: 2px;
+}
+.t3mon-header-icon {
+  icon-size: 16px;
+  margin-left: 2px;
+  margin-right: 2px;
+}
+.t3mon-header-icon-offline {
+  color: #777;
+}
+.t3mon-header-icon-waiting {
+  color: #f5a623;
+}
+.t3mon-header-count {
+  font-weight: bold;
+  font-size: 0.95em;
+  margin-right: 2px;
+}
+.t3mon-header-count-idle {
+  color: #888;
+  font-weight: normal;
+}
+
+.t3mon-graph-mini {
+  margin: 0.15em 0.25em;
+  border: solid 1px #333;
+  height: 1.4em;
+  width: 50px;
+  border-radius: 0.2em;
+}
+
+.t3mon-tooltip-item {
+  font-weight: bold;
+}
+
+.t3mon-menu-box {
+  width: 560px;
+  padding: 0.25em 0.5em;
+  spacing: 0.15em;
+}
+.t3mon-menu-header-centered {
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.9em;
+  padding: 0.5em;
+}
+.t3mon-menu-label {
+  font-size: 1em;
+  padding: 0.05em 0.5em;
+  text-align: left;
+}
+.t3mon-menu-key {
+  font-style: italic;
+  color: #999;
+  padding-top: 0.05em;
+  text-align: right;
+}
+.t3mon-menu-empty {
+  font-style: italic;
+  color: #999;
+  text-align: center;
+  padding: 0.6em;
+}
+.t3mon-menu-warning {
+  font-size: 0.9em;
+  color: #ff8a80;
+  text-align: center;
+  padding: 0.4em 0.5em;
+}
+
+.t3mon-thread {
+  border-radius: 0.5em;
+  padding: 0.45em 0.6em;
+  spacing: 0.15em;
+}
+.t3mon-thread:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.t3mon-thread-expanded {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+.t3mon-thread-head {
+  spacing: 0.5em;
+}
+.t3mon-dot {
+  font-size: 0.8em;
+  padding-top: 0.15em;
+}
+.t3mon-dot-running {
+  color: #1dacd6;
+}
+.t3mon-dot-waiting {
+  color: #f5a623;
+}
+.t3mon-dot-failed {
+  color: #d61d1d;
+}
+.t3mon-dot-idle {
+  color: #777;
+}
+.t3mon-thread-title {
+  font-weight: bold;
+}
+.t3mon-thread-usage {
+  font-feature-settings: "tnum";
+  color: #ddd;
+  min-width: 9em;
+  text-align: right;
+}
+.t3mon-thread-meta {
+  font-size: 0.85em;
+  color: #999;
+  padding-left: 1.3em;
+}
+.t3mon-thread-waiting {
+  font-size: 0.85em;
+  color: #f5a623;
+  padding-left: 1.3em;
+}
+
+.t3mon-detail {
+  padding: 0.3em 0 0.1em 1.3em;
+  spacing: 0.1em;
+}
+.t3mon-detail-header {
+  font-size: 0.75em;
+  color: #888;
+  font-weight: bold;
+  padding-top: 0.25em;
+}
+.t3mon-proc {
+  spacing: 0.5em;
+}
+.t3mon-proc-name {
+  font-family: monospace;
+  font-size: 0.85em;
+  color: #ddd;
+}
+.t3mon-proc-usage {
+  font-family: monospace;
+  font-size: 0.85em;
+  color: #aaa;
+  min-width: 10em;
+  text-align: right;
+}
+.t3mon-task {
+  font-size: 0.85em;
+  color: #ccc;
+}
+
+.t3mon-open {
+  font-size: 0.8em;
+  padding: 0.15em 0.7em;
+  border-radius: 1em;
+  color: #999;
+}
+.t3mon-open:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.t3mon-grid {
+  margin: 0.25em;
+  padding: 0;
+}
+.t3mon-graph {
+  margin: 0.5em 0.25em 0.25em 0.5em;
+  border: solid 1px #555;
+  height: 6em;
+}
+.t3mon-graph-label {
+  font-size: 0.8em;
+  padding: 0.4em 0;
+  color: #999;
+}
+.t3mon-graph-label-then {
+  font-size: 0.7em;
+  color: #999;
+  text-align: left;
+  padding: 0 0.5em;
+}
+.t3mon-graph-label-now {
+  font-size: 0.7em;
+  color: #999;
+  text-align: right;
+  padding: 0 0.5em;
+}
+.t3mon-legend {
+  font-style: italic;
+  font-size: 0.8em;
+  color: #808080;
+  text-align: center;
+}
+
+.t3mon-menu-button-box {
+  padding: 0.5em 0 0 0;
+  spacing: 2em;
+}
+.t3mon-menu-button-box > StButton {
+  border-radius: 2em;
+  margin: 0;
+  padding: 0.7em;
+  min-height: 0.5em;
+  min-width: 0.5em;
+}
+.t3mon-menu-button-box > StButton > StIcon {
+  icon-size: 1.25em;
+}

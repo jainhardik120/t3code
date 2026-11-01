@@ -6902,7 +6902,11 @@ export function makeClaudeAdapterV2(
                 cwd: turnInput.runtimePolicy.cwd,
                 attachmentsDir,
                 settings: adapterOptions.settings,
-                environment: adapterOptions.environment,
+                // The thread tag lets AgentActivity attribute this process tree.
+                environment: {
+                  ...adapterOptions.environment,
+                  T3CODE_THREAD_ID: turnInput.threadId,
+                },
                 tools: queryPolicy.tools ?? CLAUDE_CODE_PRESET_TOOLS,
                 ...mcpOverrides,
                 permissionMode: queryPolicy.permissionMode,

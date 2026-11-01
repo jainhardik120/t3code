@@ -115,6 +115,21 @@ pnpm --filter t3 deploy --prod --legacy "$release_dir"
 release_is_complete "$release_dir" ||
   die "packaged release is missing the web client or node-pty's native binding"
 
+# --- resource monitor ------------------------------------------------------
+#
+# Process telemetry (Diagnostics, per-thread usage in the GNOME panel) comes from
+# the Rust sidecar in native/resource-monitor. The server looks for it beside
+# dist/bin.mjs; without it every process view is silently empty.
+
+say "Building the resource monitor sidecar"
+CARGO="$(command -v cargo || echo "$HOME/.cargo/bin/cargo")"
+if [ -x "$CARGO" ] && "$CARGO" build --release --manifest-path native/resource-monitor/Cargo.toml; then
+  mkdir -p "$release_dir/dist/resource-monitor"
+  cp native/resource-monitor/target/release/t3-resource-monitor "$release_dir/dist/resource-monitor/"
+else
+  warn "resource monitor not built — process telemetry will be empty in this release"
+fi
+
 {
   git log -1 --format='%H%n%s%n%ad' --date=iso
   echo "branch: $branch"

@@ -28,6 +28,7 @@ import {
   THREAD_HISTORY_PAGE_POLICY,
   OLDER_THREAD_USER_TURN_LIMIT,
 } from "./threadHistoryPaging.ts";
+import * as AgentActivity from "./AgentActivity.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ProjectStore from "./ProjectStore.ts";
 import { buildActiveShellSnapshot } from "./ShellStream.ts";
@@ -72,6 +73,7 @@ export const orchestrationHttpApiLayer = HttpApiBuilder.group(
     const applicationEvents = yield* OrchestrationEventStore.OrchestrationEventStore;
     const projectStore = yield* ProjectStore.ProjectStoreV2;
     const projectEnrichment = yield* ProjectEnrichmentService.ProjectEnrichmentService;
+    const agentActivity = yield* AgentActivity.AgentActivity;
 
     const enrichProjectShells = Effect.fn("http.orchestration.enrichProjectShells")(
       (projects: ReadonlyArray<OrchestrationProjectShell>) =>
@@ -168,6 +170,16 @@ export const orchestrationHttpApiLayer = HttpApiBuilder.group(
     );
 
     return handlers
+      .handle(
+        "activity",
+        Effect.fn("environment.orchestration.activity")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          return yield* agentActivity.read.pipe(
+            Effect.catch((cause) => failEnvironmentInternal("agent_activity_failed", cause)),
+          );
+        }),
+      )
       .handle(
         "shellSnapshot",
         Effect.fn("environment.orchestration.shellSnapshot")(function* (args) {

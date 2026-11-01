@@ -172,6 +172,7 @@ import {
   makePersistedServerRuntimeState,
   persistServerRuntimeState,
 } from "./serverRuntimeState.ts";
+import * as AgentActivity from "./orchestration-v2/AgentActivity.ts";
 import { orchestrationHttpApiLayer } from "./orchestration-v2/http.ts";
 import { projectHttpApiLayer } from "./project/http.ts";
 import * as NetService from "@t3tools/shared/Net";
@@ -270,10 +271,9 @@ const PlatformServicesLive = NodeServices.layer;
 // ProviderSessionRuntime is merged so the RPC surface can resolve a transcript
 // session back to its thread for the usage page; the repository is stateless,
 // so a second instance costs nothing.
-const PersistenceLayerLive = Layer.mergeAll(
-  PushDevices.layer,
-  ProviderSessionRuntime.layer,
-).pipe(Layer.provideMerge(SqlitePersistence.layerConfig));
+const PersistenceLayerLive = Layer.mergeAll(PushDevices.layer, ProviderSessionRuntime.layer).pipe(
+  Layer.provideMerge(SqlitePersistence.layerConfig),
+);
 
 const VcsDriverRegistryLayerLive = VcsDriverRegistry.layer.pipe(
   Layer.provide(VcsProjectConfig.layer),
@@ -652,7 +652,7 @@ const makeRoutesLayer = Layer.mergeAll(
     HttpApiBuilder.layer(EnvironmentHttpApi).pipe(
       Layer.provide(authHttpApiLayer),
       Layer.provide(connectHttpApiLayer),
-      Layer.provide(orchestrationHttpApiLayer),
+      Layer.provide(orchestrationHttpApiLayer.pipe(Layer.provide(AgentActivity.layer))),
       Layer.provide(pullRequestHttpApiLayer),
       Layer.provide(projectHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
