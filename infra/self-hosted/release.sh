@@ -110,7 +110,8 @@ vp run --filter t3 build
 say "Packaging standalone release"
 rm -rf "$release_dir"
 mkdir -p "$RELEASES_DIR"
-pnpm --filter t3 deploy --prod --legacy "$release_dir"
+# Mobile/desktop patches never match the server's prod deps; pnpm >=12 rejects that.
+pnpm --filter t3 deploy --prod --legacy --config.allow-unused-patches=true "$release_dir"
 
 release_is_complete "$release_dir" ||
   die "packaged release is missing the web client or node-pty's native binding"
