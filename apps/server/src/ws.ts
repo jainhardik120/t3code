@@ -1852,6 +1852,29 @@ const makeWsRpcLayer = (
                 : {}),
             },
           ),
+        [ORCHESTRATION_V2_WS_METHODS.getCommandOutput]: (input) =>
+          observeRpcEffect(
+            ORCHESTRATION_V2_WS_METHODS.getCommandOutput,
+            threadManagement.getTurnItem(input.threadId, input.turnItemId).pipe(
+              Effect.map((item) =>
+                item?.type === "command_execution"
+                  ? {
+                      ...(item.output === undefined ? {} : { output: item.output }),
+                      ...(item.exitCode === undefined ? {} : { exitCode: item.exitCode }),
+                    }
+                  : {},
+              ),
+              Effect.mapError(
+                (cause) =>
+                  new OrchestrationV2GetThreadProjectionError({
+                    threadId: input.threadId,
+                    message: "Failed to load command output",
+                    cause,
+                  }),
+              ),
+            ),
+            { "rpc.aggregate": "orchestration" },
+          ),
         [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: (input) =>
           observeRpcEffect(
             ORCHESTRATION_V2_WS_METHODS.getWorkflowScript,

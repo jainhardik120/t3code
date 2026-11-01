@@ -3735,13 +3735,16 @@ export function makeClaudeAdapterV2(
             parentItemId: null,
             ordinal: input.ordinal,
             status: input.status,
+            // Claude describes each Bash call in plain language; keep it as the title.
             title:
-              readPath !== undefined
-                ? formatReadToolLabel(readPath)
-                : (searchTitle ??
-                  dynamicToolTitle(input.toolName, nativeToolInput) ??
-                  input.presentation?.title ??
-                  null),
+              input.classification.itemType === "command_execution"
+                ? (firstStringInputField(input.toolInput, ["description"]) ?? null)
+                : readPath !== undefined
+                  ? formatReadToolLabel(readPath)
+                  : (searchTitle ??
+                    dynamicToolTitle(input.toolName, nativeToolInput) ??
+                    input.presentation?.title ??
+                    null),
             startedAt: input.startedAt,
             completedAt,
             updatedAt: input.updatedAt,
