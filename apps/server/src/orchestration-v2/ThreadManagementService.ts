@@ -283,6 +283,7 @@ export interface ThreadManagementServiceShape {
   readonly getCheckpointContext: Orchestrator.OrchestratorV2["Service"]["getCheckpointContext"];
   readonly getThreadSnapshot: Orchestrator.OrchestratorV2["Service"]["getThreadSnapshot"];
   readonly getThreadSnapshotWindow: Orchestrator.OrchestratorV2["Service"]["getThreadSnapshotWindow"];
+  readonly getTurnItem: Orchestrator.OrchestratorV2["Service"]["getTurnItem"];
   readonly getProjectThreadRecords: <K extends ProjectionRecordField>(
     input: { readonly projectId: ProjectId; readonly threadId: ThreadId },
     fields: ReadonlyArray<K>,
@@ -440,6 +441,11 @@ const make = Effect.gen(function* () {
   ) =>
     ensureProjectionTranscript(threadId).pipe(
       Effect.andThen(orchestrator.getThreadSnapshotWindow(threadId, options)),
+    );
+
+  const getTurnItem: ThreadManagementServiceShape["getTurnItem"] = (threadId, turnItemId) =>
+    ensureProjectionTranscript(threadId).pipe(
+      Effect.andThen(orchestrator.getTurnItem(threadId, turnItemId)),
     );
 
   const dispatch: ThreadManagementServiceShape["dispatch"] = (command) =>
@@ -727,6 +733,7 @@ const make = Effect.gen(function* () {
     getCheckpointContext,
     getThreadSnapshot,
     getThreadSnapshotWindow,
+    getTurnItem,
     getProjectThreadRecords,
     getProjectThread,
     getShellSnapshot: orchestrator.getShellSnapshot,

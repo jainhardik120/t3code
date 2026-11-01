@@ -3735,13 +3735,16 @@ export function makeClaudeAdapterV2(
             parentItemId: null,
             ordinal: input.ordinal,
             status: input.status,
+            // Claude describes each Bash call in plain language; keep it as the title.
             title:
-              readPath !== undefined
-                ? formatReadToolLabel(readPath)
-                : (searchTitle ??
-                  dynamicToolTitle(input.toolName, nativeToolInput) ??
-                  input.presentation?.title ??
-                  null),
+              input.classification.itemType === "command_execution"
+                ? (firstStringInputField(input.toolInput, ["description"]) ?? null)
+                : readPath !== undefined
+                  ? formatReadToolLabel(readPath)
+                  : (searchTitle ??
+                    dynamicToolTitle(input.toolName, nativeToolInput) ??
+                    input.presentation?.title ??
+                    null),
             startedAt: input.startedAt,
             completedAt,
             updatedAt: input.updatedAt,
@@ -6899,7 +6902,11 @@ export function makeClaudeAdapterV2(
                 cwd: turnInput.runtimePolicy.cwd,
                 attachmentsDir,
                 settings: adapterOptions.settings,
-                environment: adapterOptions.environment,
+                // The thread tag lets AgentActivity attribute this process tree.
+                environment: {
+                  ...adapterOptions.environment,
+                  T3CODE_THREAD_ID: turnInput.threadId,
+                },
                 tools: queryPolicy.tools ?? CLAUDE_CODE_PRESET_TOOLS,
                 ...mcpOverrides,
                 permissionMode: queryPolicy.permissionMode,

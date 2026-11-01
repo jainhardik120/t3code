@@ -271,6 +271,7 @@ import { TimelineSystemDivider } from "./TimelineSystemDivider";
 import { SkillChipIcon, SkillInlineText } from "./SkillInlineText";
 import * as DateTime from "effect/DateTime";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
+import { CommandDetailsDialog } from "./CommandDetailsDialog";
 import {
   buildReviewCommentRenderablePatch,
   formatReviewCommentFence,
@@ -4953,6 +4954,12 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
   const [expanded, setExpanded] = useState(
     () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
   );
+  // Commands open a details dialog instead of expanding inline.
+  const commandItem =
+    workEntry.projectedItem?.item.type === "command_execution"
+      ? workEntry.projectedItem.item
+      : undefined;
+  const [commandDialogOpen, setCommandDialogOpen] = useState(false);
   const toggleExpanded = () => {
     const next = !expanded;
     if (groupView) {
@@ -5106,170 +5113,201 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
   const accessibleDisplayText = showFailedIndicator
     ? `${accessiblePreview}, tool call failed`
     : accessiblePreview;
-  const rowToggleProps = canExpandProjectedItem
+  const rowToggleProps = commandItem
     ? {
         role: "button" as const,
         tabIndex: 0 as const,
         "aria-label": accessibleDisplayText,
-        "aria-expanded": expanded,
-        onClick: toggleExpanded,
+        "aria-haspopup": "dialog" as const,
+        onClick: () => setCommandDialogOpen(true),
         onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            toggleExpanded();
+            setCommandDialogOpen(true);
           }
         },
       }
-    : {};
+    : canExpandProjectedItem
+      ? {
+          role: "button" as const,
+          tabIndex: 0 as const,
+          "aria-label": accessibleDisplayText,
+          "aria-expanded": expanded,
+          onClick: toggleExpanded,
+          onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleExpanded();
+            }
+          },
+        }
+      : {};
 
   return (
-    <WorkLogRow
-      data-v2-item-type={workEntry.projectedItem?.item.type}
-      data-v2-item-visibility={workEntry.projectedItem?.visibility}
-      {...rowToggleProps}
-      icon={
-        <span
-          className={iconWrapperClass}
-          role={showFailedIndicator ? "img" : undefined}
-          aria-label={showFailedIndicator ? "Tool call failed" : undefined}
-        >
-          <ToolActivityIconView
-            icon={entryToolIcon}
-            fallbackName={entryIconName}
-            className="block size-4 shrink-0 stroke-2"
-            muted
-          />
-        </span>
-      }
-      label={
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
-            <span
-              className={cn(answerPreview ? "min-w-0" : "min-w-0 flex-1", "truncate", headingClass)}
-            >
-              {isReasoning && !expanded ? (
-                <ReactMarkdown
-                  remarkPlugins={[
-                    remarkGfm,
-                    [
-                      remarkThoughtPreview,
-                      workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
-                    ],
-                  ]}
-                >
-                  {workEntry.detail ?? previewText}
-                </ReactMarkdown>
-              ) : (
-                previewText
-              )}
-            </span>
-            {answerPreview ? (
-              <span
-                className={cn(
-                  "min-w-0 truncate",
-                  !expanded &&
-                    workEntry.questionAnswer &&
-                    hasQuestionAnswer(workEntry.questionAnswer)
-                    ? "text-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {answerPreview}
-              </span>
-            ) : null}
-          </p>
-        </div>
-      }
-      trailing={
-        <>
-          {createdThread ? (
-            <button
-              type="button"
-              className="shrink-0 rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Open ${createdThread.title ?? "created thread"}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                ctx.onOpenThread(createdThread.targetThreadId);
-              }}
-              onKeyDown={stopRowToggle}
-            >
-              Open chat
-            </button>
-          ) : null}
-          {notifiedSubagentThreadId ? (
-            <InlineButton
-              aria-label="Open subagent thread"
-              onClick={(event) => {
-                event.stopPropagation();
-                ctx.onOpenThread(notifiedSubagentThreadId);
-              }}
-              onKeyDown={stopRowToggle}
-            >
-              Open subagent
-            </InlineButton>
-          ) : null}
-          {showFailedIndicator &&
-          !showDestructiveRowStyle &&
-          !toolIconAcceptsTint(entryIconName, entryToolIcon) ? (
-            <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
-          ) : null}
-          <TimelineRowTimestamp createdAt={workEntry.createdAt} timestampFormat={timestampFormat} />
+    <>
+      {commandItem && commandDialogOpen ? (
+        <CommandDetailsDialog
+          item={commandItem}
+          environmentId={ctx.activeThreadEnvironmentId}
+          workspaceRoot={workspaceRoot}
+          onClose={() => setCommandDialogOpen(false)}
+        />
+      ) : null}
+      <WorkLogRow
+        data-v2-item-type={workEntry.projectedItem?.item.type}
+        data-v2-item-visibility={workEntry.projectedItem?.visibility}
+        {...rowToggleProps}
+        icon={
           <span
-            className={cn(
-              "flex size-4 shrink-0 items-center justify-center",
-              !canExpandProjectedItem && "invisible",
-            )}
-            aria-hidden
+            className={iconWrapperClass}
+            role={showFailedIndicator ? "img" : undefined}
+            aria-label={showFailedIndicator ? "Tool call failed" : undefined}
           >
-            <ChevronRightIcon
-              className={cn(
-                "size-3 shrink-0 text-icon-muted opacity-70 transition-transform duration-200",
-                expanded && "rotate-90",
-              )}
+            <ToolActivityIconView
+              icon={entryToolIcon}
+              fallbackName={entryIconName}
+              className="block size-4 shrink-0 stroke-2"
+              muted
             />
           </span>
-        </>
-      }
-    >
-      {expanded && viewedImage && threadRef ? (
-        <WorkLogDetails kind="media">
-          <ChatMarkdownAssetImage
-            environmentId={threadRef.environmentId}
-            resource={viewedImage.resource}
-            alt={viewedImage.alt}
-            srcFragment={viewedImage.srcFragment}
-            workspaceRoot={workspaceRoot}
-            maxHeightRem={16}
-            onImageExpand={onImageExpand}
-          />
-        </WorkLogDetails>
-      ) : null}
-      {expanded && workEntry.questionAnswer ? (
-        <QuestionAnswerHistory answer={workEntry.questionAnswer} />
-      ) : null}
-      {expanded && isReasoning ? <ReasoningTraceContent entries={[workEntry]} /> : null}
-      {expanded &&
-      !isReasoning &&
-      !workEntry.questionAnswer &&
-      canExpandProjectedItem &&
-      (expandedBody || (workEntry.projectedItem && plainOutput === undefined)) ? (
-        <WorkLogDetails kind="panel">
-          {workEntry.projectedItem && plainOutput === undefined ? (
-            <V2ItemInspector
-              projectedItem={workEntry.projectedItem}
-              environmentId={ctx.activeThreadEnvironmentId}
-              cwd={ctx.markdownCwd}
-              workspaceRoot={workspaceRoot}
-              onOpenThread={ctx.onOpenThread}
-              onOpenTurnDiff={ctx.onOpenTurnDiff}
-              onRollbackCheckpoint={ctx.onRollbackCheckpoint}
+        }
+        label={
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
+              <span
+                className={cn(
+                  answerPreview ? "min-w-0" : "min-w-0 flex-1",
+                  "truncate",
+                  headingClass,
+                )}
+              >
+                {isReasoning && !expanded ? (
+                  <ReactMarkdown
+                    remarkPlugins={[
+                      remarkGfm,
+                      [
+                        remarkThoughtPreview,
+                        workEntry.toolLifecycleStatus === "inProgress" ? "Thinking" : "Thought",
+                      ],
+                    ]}
+                  >
+                    {workEntry.detail ?? previewText}
+                  </ReactMarkdown>
+                ) : (
+                  previewText
+                )}
+              </span>
+              {answerPreview ? (
+                <span
+                  className={cn(
+                    "min-w-0 truncate",
+                    !expanded &&
+                      workEntry.questionAnswer &&
+                      hasQuestionAnswer(workEntry.questionAnswer)
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {answerPreview}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        }
+        trailing={
+          <>
+            {createdThread ? (
+              <button
+                type="button"
+                className="shrink-0 rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Open ${createdThread.title ?? "created thread"}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  ctx.onOpenThread(createdThread.targetThreadId);
+                }}
+                onKeyDown={stopRowToggle}
+              >
+                Open chat
+              </button>
+            ) : null}
+            {notifiedSubagentThreadId ? (
+              <InlineButton
+                aria-label="Open subagent thread"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  ctx.onOpenThread(notifiedSubagentThreadId);
+                }}
+                onKeyDown={stopRowToggle}
+              >
+                Open subagent
+              </InlineButton>
+            ) : null}
+            {showFailedIndicator &&
+            !showDestructiveRowStyle &&
+            !toolIconAcceptsTint(entryIconName, entryToolIcon) ? (
+              <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
+            ) : null}
+            <TimelineRowTimestamp
+              createdAt={workEntry.createdAt}
+              timestampFormat={timestampFormat}
             />
-          ) : expandedBody ? (
-            <pre className={toolCallExpandedBodyClassName}>{expandedBody}</pre>
-          ) : null}
-        </WorkLogDetails>
-      ) : null}
-    </WorkLogRow>
+            <span
+              className={cn(
+                "flex size-4 shrink-0 items-center justify-center",
+                !canExpandProjectedItem && "invisible",
+              )}
+              aria-hidden
+            >
+              <ChevronRightIcon
+                className={cn(
+                  "size-3 shrink-0 text-icon-muted opacity-70 transition-transform duration-200",
+                  expanded && "rotate-90",
+                )}
+              />
+            </span>
+          </>
+        }
+      >
+        {expanded && viewedImage && threadRef ? (
+          <WorkLogDetails kind="media">
+            <ChatMarkdownAssetImage
+              environmentId={threadRef.environmentId}
+              resource={viewedImage.resource}
+              alt={viewedImage.alt}
+              srcFragment={viewedImage.srcFragment}
+              workspaceRoot={workspaceRoot}
+              maxHeightRem={16}
+              onImageExpand={onImageExpand}
+            />
+          </WorkLogDetails>
+        ) : null}
+        {expanded && workEntry.questionAnswer ? (
+          <QuestionAnswerHistory answer={workEntry.questionAnswer} />
+        ) : null}
+        {expanded && isReasoning ? <ReasoningTraceContent entries={[workEntry]} /> : null}
+        {expanded &&
+        !isReasoning &&
+        !workEntry.questionAnswer &&
+        canExpandProjectedItem &&
+        (expandedBody || (workEntry.projectedItem && plainOutput === undefined)) ? (
+          <WorkLogDetails kind="panel">
+            {workEntry.projectedItem && plainOutput === undefined ? (
+              <V2ItemInspector
+                projectedItem={workEntry.projectedItem}
+                environmentId={ctx.activeThreadEnvironmentId}
+                cwd={ctx.markdownCwd}
+                workspaceRoot={workspaceRoot}
+                onOpenThread={ctx.onOpenThread}
+                onOpenTurnDiff={ctx.onOpenTurnDiff}
+                onRollbackCheckpoint={ctx.onRollbackCheckpoint}
+              />
+            ) : expandedBody ? (
+              <pre className={toolCallExpandedBodyClassName}>{expandedBody}</pre>
+            ) : null}
+          </WorkLogDetails>
+        ) : null}
+      </WorkLogRow>
+    </>
   );
 });
 

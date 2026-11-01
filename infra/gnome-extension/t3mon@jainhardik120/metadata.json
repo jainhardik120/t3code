@@ -1,0 +1,8 @@
+{
+  "uuid": "t3mon@jainhardik120",
+  "name": "T3 Monitor",
+  "description": "Running T3 Code agents, their background work and per-thread CPU/memory, from the local T3 server.",
+  "shell-version": ["50", "51"],
+  "url": "https://github.com/pingdotgg/t3code",
+  "version": 1
+}

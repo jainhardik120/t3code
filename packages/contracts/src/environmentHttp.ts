@@ -41,6 +41,7 @@ import {
   OrchestrationV2ThreadDetailSnapshot,
   OrchestrationV2ThreadHistoryPage,
 } from "./orchestrationV2.ts";
+import { AgentActivitySnapshot } from "./agentActivity.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import {
   PullRequestDiffInput,
@@ -524,6 +525,13 @@ const EnvironmentOrchestrationThreadHistoryErrors = [
 ] as const;
 
 class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestration")
+  .add(
+    HttpApiEndpoint.get("activity", "/api/orchestration/activity", {
+      headers: OptionalBearerHeaders,
+      success: AgentActivitySnapshot,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
   .add(
     HttpApiEndpoint.get("shellSnapshot", "/api/orchestration/shell", {
       headers: OrchestrationProtocolHeaders,

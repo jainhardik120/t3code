@@ -46,6 +46,7 @@ import {
   type ProviderSessionId,
   RunId,
   ThreadLinkedPullRequest,
+  TurnItemId,
   ThreadId,
 } from "@t3tools/contracts";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
@@ -269,6 +270,10 @@ export interface OrchestratorV2Shape {
     },
     OrchestratorV2Error
   >;
+  readonly getTurnItem: (
+    threadId: ThreadId,
+    turnItemId: TurnItemId,
+  ) => Effect.Effect<OrchestrationV2TurnItem | undefined, OrchestratorV2Error>;
   readonly getThreadSnapshotWindow: (
     threadId: ThreadId,
     options: Parameters<ProjectionStoreV2["Service"]["getThreadSnapshotWindow"]>[1],
@@ -9806,6 +9811,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       projectionStore
         .getThreadSnapshot(threadId)
         .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause }))),
+    getTurnItem: (threadId, turnItemId) =>
+      projectionStore
+        .getTurnItem(threadId, turnItemId)
+        .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause }))),
     getThreadSnapshotWindow: (threadId, options) =>
       projectionStore
         .getThreadSnapshotWindow(threadId, options)
@@ -9923,6 +9932,13 @@ const layerUnavailable: Layer.Layer<OrchestratorV2> = Layer.succeed(
         }),
       ),
     getThreadSnapshot: (threadId) =>
+      Effect.fail(
+        new OrchestratorProjectionError({
+          threadId,
+          cause: "Orchestration V2 live runtime is not configured.",
+        }),
+      ),
+    getTurnItem: (threadId) =>
       Effect.fail(
         new OrchestratorProjectionError({
           threadId,

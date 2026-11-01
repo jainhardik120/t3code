@@ -2928,6 +2928,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   getArchivedShellSnapshot: "orchestration.getArchivedShellSnapshot",
   getThreadProjection: "orchestration.getThreadProjection",
   getWorkflowScript: "orchestration.getWorkflowScript",
+  getCommandOutput: "orchestration.getCommandOutput",
   launchThread: "orchestration.launchThread",
   subscribeArchivedShell: "orchestration.subscribeArchivedShell",
   subscribeShell: "orchestration.subscribeShell",
@@ -3217,6 +3218,20 @@ export const OrchestrationV2RpcError = Schema.Union([
 ]);
 export type OrchestrationV2RpcError = typeof OrchestrationV2RpcError.Type;
 
+// Command output is stripped from the wire projection; clients read it on demand.
+export const OrchestrationV2GetCommandOutputInput = Schema.Struct({
+  threadId: ThreadId,
+  turnItemId: TurnItemId,
+});
+export type OrchestrationV2GetCommandOutputInput = typeof OrchestrationV2GetCommandOutputInput.Type;
+
+export const OrchestrationV2GetCommandOutputResult = Schema.Struct({
+  output: Schema.optional(Schema.String),
+  exitCode: Schema.optional(Schema.Int),
+});
+export type OrchestrationV2GetCommandOutputResult =
+  typeof OrchestrationV2GetCommandOutputResult.Type;
+
 export const OrchestrationV2GetWorkflowScriptInput = Schema.Struct({
   threadId: ThreadId,
   /** Absolute path from the workflow's runHandles.scriptPath. The server
@@ -3291,6 +3306,10 @@ export const OrchestrationV2RpcSchemas = {
   getWorkflowScript: {
     input: OrchestrationV2GetWorkflowScriptInput,
     output: OrchestrationV2GetWorkflowScriptResult,
+  },
+  getCommandOutput: {
+    input: OrchestrationV2GetCommandOutputInput,
+    output: OrchestrationV2GetCommandOutputResult,
   },
   launchThread: {
     input: OrchestrationV2ThreadLaunchInput,
