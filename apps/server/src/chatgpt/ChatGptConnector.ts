@@ -14,8 +14,8 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
-import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
-import type * as RpcClientError from "effect/unstable/rpc/RpcClientError";
+import { RpcClient, RpcSerialization } from "effect/rpc";
+import type * as RpcClientError from "effect/rpc/RpcClientError";
 import { NodeSocket } from "@effect/platform-node";
 
 import {
@@ -51,11 +51,16 @@ export class ChatGptConnector extends Context.Service<
   ChatGptConnector,
   {
     readonly ping: () => Effect.Effect<ConnectorPing, ChatGptConnectorError>;
-    readonly listAccounts: () => Effect.Effect<ReadonlyArray<ConnectorAccount>, ChatGptConnectorError>;
+    readonly listAccounts: () => Effect.Effect<
+      ReadonlyArray<ConnectorAccount>,
+      ChatGptConnectorError
+    >;
     readonly syncStatus: (
       accountId?: string,
     ) => Effect.Effect<ReadonlyArray<ConnectorSyncStatus>, ChatGptConnectorError>;
-    readonly listConversations: (input: ListConversationsInput) => Effect.Effect<
+    readonly listConversations: (
+      input: ListConversationsInput,
+    ) => Effect.Effect<
       { items: ReadonlyArray<ConnectorConversationSummary>; total: number },
       ChatGptConnectorError
     >;
@@ -106,13 +111,22 @@ export const make = Effect.sync(() => {
     );
 
   return ChatGptConnector.of({
-    ping: () => run((c) => c["connector.ping"]()),
-    listAccounts: () => run((c) => c["connector.listAccounts"]()),
-    syncStatus: (accountId) => run((c) => c["connector.syncStatus"](accountId ? { accountId } : {})),
-    listConversations: (input) => run((c) => c["connector.listConversations"](input)),
-    search: (input) => run((c) => c["connector.search"](input)),
-    getConversation: (conversationId) =>
+    ping: Effect.fn("ChatGptConnector.ping")(() => run((c) => c["connector.ping"]())),
+    listAccounts: Effect.fn("ChatGptConnector.listAccounts")(() =>
+      run((c) => c["connector.listAccounts"]()),
+    ),
+    syncStatus: Effect.fn("ChatGptConnector.syncStatus")((accountId) =>
+      run((c) => c["connector.syncStatus"](accountId ? { accountId } : {})),
+    ),
+    listConversations: Effect.fn("ChatGptConnector.listConversations")((input) =>
+      run((c) => c["connector.listConversations"](input)),
+    ),
+    search: Effect.fn("ChatGptConnector.search")((input) =>
+      run((c) => c["connector.search"](input)),
+    ),
+    getConversation: Effect.fn("ChatGptConnector.getConversation")((conversationId) =>
       run((c) => c["connector.getConversation"]({ conversationId })),
+    ),
     send: (input) =>
       runStream((c) =>
         c["connector.send"]({

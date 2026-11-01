@@ -1,4 +1,12 @@
-import type { EnvironmentId, OrchestrationV2TurnItem } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  OrchestrationV2ProjectedTurnItem,
+  OrchestrationV2TurnItem,
+} from "@t3tools/contracts";
+import {
+  turnItemDetailRevision,
+  turnItemNeedsDetailFetch,
+} from "@t3tools/client-runtime/work-log/item-detail";
 import {
   describeShellRedirects,
   parseShellCommand,
@@ -7,17 +15,18 @@ import {
   type ShellConnector,
   type ShellStep,
 } from "@t3tools/shared/shellCommand";
+import * as DateTime from "effect/DateTime";
 import { CheckIcon, ChevronRightIcon, CopyIcon, FolderIcon } from "lucide-react";
-import { Suspense, use, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, use, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
-import { useTheme } from "../../hooks/useTheme";
+import { useRenderedAppearance } from "../../hooks/useTheme";
 import { resolveDiffThemeName } from "../../lib/diffRendering";
 import { getSyntaxHighlighterPromise } from "../../lib/syntaxHighlighting";
 import { cn } from "../../lib/utils";
-import { orchestrationEnvironment } from "../../state/orchestration";
-import { useEnvironmentQuery } from "../../state/query";
+import { useTurnItemDetail } from "../../state/queries";
+import type { TurnItemSource } from "./timelineRowContext";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle } from "../ui/dialog";
@@ -27,8 +36,9 @@ import { Toggle, ToggleGroup } from "../ui/toggle-group";
 type CommandItem = Extract<OrchestrationV2TurnItem, { readonly type: "command_execution" }>;
 
 interface CommandDetailsDialogProps {
-  readonly item: CommandItem;
-  readonly environmentId: EnvironmentId | null;
+  readonly projectedItem: OrchestrationV2ProjectedTurnItem;
+  readonly environmentId: EnvironmentId;
+  readonly source?: TurnItemSource | undefined;
   readonly workspaceRoot: string | undefined;
   readonly onClose: () => void;
 }
@@ -55,9 +65,12 @@ function readCommandOutput(raw: string): { stdout: string; stderr: string } {
   return { stdout: raw, stderr: "" };
 }
 
-function formatDuration(startedAt: string | null, completedAt: string | null): string | null {
+function formatDuration(
+  startedAt: DateTime.Utc | null,
+  completedAt: DateTime.Utc | null,
+): string | null {
   if (!startedAt || !completedAt) return null;
-  const ms = Date.parse(completedAt) - Date.parse(startedAt);
+  const ms = DateTime.toEpochMillis(completedAt) - DateTime.toEpochMillis(startedAt);
   if (!Number.isFinite(ms) || ms < 0) return null;
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
@@ -70,33 +83,36 @@ function displayPath(path: string, workspaceRoot: string | undefined) {
 }
 
 export function CommandDetailsDialog({
-  item,
+  projectedItem,
   environmentId,
   workspaceRoot,
+  source,
   onClose,
 }: CommandDetailsDialogProps) {
+  const wireItem = projectedItem.item as CommandItem;
+  // The wire projection withholds command output; fetch the full item when it did.
+  const fetches = turnItemNeedsDetailFetch(wireItem);
+  const detail = useTurnItemDetail(
+    fetches
+      ? {
+          environmentId,
+          threadId: projectedItem.sourceThreadId,
+          itemId: projectedItem.sourceItemId,
+          revision: turnItemDetailRevision(wireItem),
+        }
+      : null,
+    source?.detail,
+  );
+  const fetchedItem = detail.data?.item;
+  const item = fetchedItem?.type === "command_execution" ? fetchedItem : wireItem;
   const parsed = useMemo(() => parseShellCommand(item.input), [item.input]);
   const [view, setView] = useState<"parsed" | "raw">("parsed");
-  const outputQuery = useEnvironmentQuery(
-    environmentId === null
-      ? null
-      : orchestrationEnvironment.commandOutput({
-          environmentId,
-          input: { threadId: item.threadId, turnItemId: item.id },
-        }),
-  );
-  // Output lands when the command finishes; refetch once it does.
-  const { refresh } = outputQuery;
-  useEffect(() => {
-    if (item.completedAt) refresh();
-  }, [item.completedAt, refresh]);
-
   const streams = useMemo(() => {
-    const raw = outputQuery.data?.output;
+    const raw = item.output;
     if (raw === undefined) return null;
     const { stdout, stderr } = readCommandOutput(raw);
     return { stdout: stdout.replace(ANSI_PATTERN, ""), stderr: stderr.replace(ANSI_PATTERN, "") };
-  }, [outputQuery.data?.output]);
+  }, [item.output]);
   const output =
     streams === null
       ? null
@@ -109,7 +125,7 @@ export function CommandDetailsDialog({
       ? [...stdoutSections, { title: "stderr", marker: "stderr", text: streams.stderr }]
       : stdoutSections;
   }, [parsed, streams]);
-  const exitCode = outputQuery.data?.exitCode ?? item.exitCode;
+  const exitCode = item.exitCode;
   const running = item.status === "running" || item.status === "pending";
   const failed =
     item.status === "failed" ||
@@ -206,9 +222,9 @@ export function CommandDetailsDialog({
             <div ref={outputRef} className="min-h-0 flex-1 overflow-auto px-4 py-3">
               <OutputView
                 sections={sections}
-                pending={outputQuery.isPending}
+                pending={fetches && item === wireItem && detail.isPending}
                 running={running}
-                error={outputQuery.error}
+                error={fetches && item === wireItem ? detail.error : null}
                 empty={output === null || output.trim().length === 0}
               />
             </div>
@@ -532,7 +548,7 @@ function CodeBlock(props: { readonly code: string; readonly language: string }) 
 }
 
 function HighlightedCode(props: { readonly code: string; readonly language: string }) {
-  const { resolvedTheme } = useTheme();
+  const resolvedTheme = useRenderedAppearance();
   const themeName = resolveDiffThemeName(resolvedTheme);
   const highlighter = use(getSyntaxHighlighterPromise(props.language));
   const html = useMemo(() => {

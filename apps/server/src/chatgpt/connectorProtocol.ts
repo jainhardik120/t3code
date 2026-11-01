@@ -10,8 +10,8 @@
  * @module chatgpt/connectorProtocol
  */
 import * as Schema from "effect/Schema";
-import * as Rpc from "effect/unstable/rpc/Rpc";
-import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
+import * as Rpc from "effect/rpc/Rpc";
+import * as RpcGroup from "effect/rpc/RpcGroup";
 
 /** The protocol version T3 speaks; checked against the daemon's `ping`. */
 export const EXPECTED_CONNECTOR_PROTOCOL = 1;

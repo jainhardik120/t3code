@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import * as SqlClient from "effect/unstable/sql/SqlClient";
+import * as SqlClient from "effect/sql/SqlClient";
 
 // Self-hosted push notifications: each row is a device that registered its
 // native push token (FCM on Android, APNs on iOS) with this server over its

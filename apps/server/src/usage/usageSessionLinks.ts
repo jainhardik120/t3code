@@ -67,7 +67,7 @@ export function attachSessionLinks(
   summary: UsageSummary,
   links: ReadonlyMap<string, ThreadLabel>,
 ): UsageSummary {
-  if (links.size === 0) return summary;
+  if (links.size === 0 || summary.sessions === undefined) return summary;
   return {
     ...summary,
     sessions: summary.sessions.map((session) => {

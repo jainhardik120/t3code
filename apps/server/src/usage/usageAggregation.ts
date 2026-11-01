@@ -1,17 +1,4 @@
 // @effect-diagnostics globalDate:off
-/**
- * Folds parsed transcript records into `(day, hourStart?, provider, model)`
- * buckets.
- *
- * `Intl.DateTimeFormat` is the only reliable way to resolve a wall-clock day in
- * an arbitrary IANA zone, and it takes a `Date`. That is why the raw `Date`
- * construction is allowed here; nothing in this module reads the clock.
- *
- * Pure, so the bucketing and de-duplication rules are testable without touching
- * the filesystem or the network.
- *
- * @module usageAggregation
- */
 import type {
   UsageBucket,
   UsageCategoryCost,
@@ -22,15 +9,10 @@ import type {
   UsageTokenTotals,
 } from "@t3tools/contracts";
 
-import { addTotals, EMPTY_TOTALS, type UsageRecord } from "./usageTranscripts.ts";
+import { EMPTY_TOTALS, type UsageRecord } from "@t3tools/provider-core/server/usage";
 import { cacheSavingsUsd, priceUsage, type RateTable } from "./usagePricing.ts";
 
-/**
- * Formats an instant as a `YYYY-MM-DD` day in `timeZone`.
- *
- * `en-CA` yields ISO-ordered parts, which is why it is used here rather than
- * assembling the day from `Date` getters (those are host-local only).
- */
+// en-CA gives ISO-ordered parts in the requested zone; Date getters are host-local.
 function makeDayFormatter(timeZone: string): (timestampMs: number) => string {
   let format: Intl.DateTimeFormat;
   try {
@@ -41,7 +23,6 @@ function makeDayFormatter(timeZone: string): (timestampMs: number) => string {
       day: "2-digit",
     });
   } catch {
-    // An unknown zone should degrade to UTC rather than fail the whole scan.
     format = new Intl.DateTimeFormat("en-CA", {
       timeZone: "UTC",
       year: "numeric",
@@ -49,13 +30,26 @@ function makeDayFormatter(timeZone: string): (timestampMs: number) => string {
       day: "2-digit",
     });
   }
-  return (timestampMs) => format.format(new Date(timestampMs));
+  // Cache quarter-hour slots to avoid per-record Intl calls; fixed-offset midnight can split slots and needs exact formatting.
+  const days = new Map<number, string | null>();
+  return (timestampMs) => {
+    const slot = Math.floor(timestampMs / QUARTER_HOUR_MS);
+    let day = days.get(slot);
+    if (day === undefined) {
+      const first = format.format(new Date(slot * QUARTER_HOUR_MS));
+      const last = format.format(new Date((slot + 1) * QUARTER_HOUR_MS - 1));
+      day = first === last ? first : null;
+      days.set(slot, day);
+    }
+    return day ?? format.format(new Date(timestampMs));
+  };
 }
 
+const QUARTER_HOUR_MS = 15 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 interface MutableBucket {
-  totals: UsageTokenTotals;
+  totals: { -readonly [K in keyof UsageTokenTotals]: number };
   costUsd: number;
   cacheSavingsUsd: number;
   categoryCostUsd: UsageCategoryCost | null;
@@ -70,7 +64,7 @@ interface MutableBucket {
 
 function emptyBucket(): MutableBucket {
   return {
-    totals: EMPTY_TOTALS,
+    totals: { ...EMPTY_TOTALS },
     costUsd: 0,
     cacheSavingsUsd: 0,
     categoryCostUsd: null,
@@ -84,12 +78,15 @@ function emptyBucket(): MutableBucket {
   };
 }
 
-/**
- * A project or session rollup.
- *
- * Extends the day/model bucket's shape with the span of days it covers, which
- * those buckets get for free from their key but these have to observe.
- */
+function accumulateTotals(target: MutableBucket["totals"], add: UsageTokenTotals): void {
+  target.uncachedInputTokens += add.uncachedInputTokens;
+  target.cachedInputTokens += add.cachedInputTokens;
+  target.cacheCreationTokens += add.cacheCreationTokens;
+  target.outputTokens += add.outputTokens;
+  target.reasoningTokens += add.reasoningTokens;
+}
+
+/** A project or session rollup: a bucket plus the span of days it covers. */
 interface MutableGroup extends MutableBucket {
   provider: string;
   projectPath: string;
@@ -98,34 +95,50 @@ interface MutableGroup extends MutableBucket {
   lastDay: string;
 }
 
+interface GroupContribution {
+  readonly record: UsageRecord;
+  readonly day: string;
+  readonly priced: { readonly costUsd: number; readonly costSource: UsageBucket["costSource"] };
+  readonly savings: number;
+}
+
 export interface AggregateOptions {
   readonly timeZone: string;
   readonly sinceDay: string;
   readonly untilDay: string;
   readonly rates: RateTable;
   readonly priceOverrides?: RateTable;
+  readonly modelAliases?: ReadonlyMap<string, string>;
   readonly resolution?: UsageResolution;
   readonly sinceTimeMs?: number;
   readonly untilTimeMs?: number;
 }
 
+export function resolveModelAliases(
+  aliases: Readonly<Record<string, string>>,
+): ReadonlyMap<string, string> {
+  const resolved = new Map<string, string>();
+  for (const model of Object.keys(aliases)) {
+    const seen = new Set([model]);
+    let target = aliases[model]!;
+    while (Object.hasOwn(aliases, target) && !seen.has(target)) {
+      seen.add(target);
+      target = aliases[target]!;
+    }
+    if (!Object.hasOwn(aliases, target)) resolved.set(model, target);
+  }
+  return resolved;
+}
+
 export interface AggregateResult {
   readonly buckets: readonly UsageBucket[];
-  /** Records dropped because an earlier record carried the same dedupe key. */
   readonly duplicatesDropped: number;
-  /** Records whose day fell outside the requested window. */
   readonly outOfWindow: number;
   readonly projects: readonly UsageProjectBucket[];
   readonly sessions: readonly UsageSessionBucket[];
 }
 
-/**
- * Accumulates records across many files.
- *
- * De-duplication is global across the whole scan, not per file: Claude Code
- * copies a message's records forward when a session is resumed or forked, so
- * the same `dedupeKey` legitimately appears in several transcripts.
- */
+/** Deduplicates across the whole scan; Claude copies records into resumed/forked transcripts. */
 export class UsageAggregator {
   readonly #buckets = new Map<string, MutableBucket>();
   readonly #projects = new Map<string, MutableGroup>();
@@ -134,6 +147,14 @@ export class UsageAggregator {
   readonly #toDay: (timestampMs: number) => string;
   readonly #hourlyWindow: { readonly sinceTimeMs: number; readonly untilTimeMs: number } | null;
   readonly #options: AggregateOptions;
+  #lastBucket: {
+    readonly day: string;
+    readonly hourIndex: number;
+    readonly provider: string;
+    readonly model: string;
+    readonly source: string;
+    readonly bucket: MutableBucket;
+  } | null = null;
   #duplicatesDropped = 0;
   #outOfWindow = 0;
 
@@ -153,12 +174,8 @@ export class UsageAggregator {
     }
   }
 
-  /**
-   * Folds one record in. Returns whether it actually contributed, so callers
-   * can derive per-window facts (distinct sessions, for one) from the records
-   * that landed rather than everything the mtime prefilter happened to admit.
-   */
-  add(record: UsageRecord, sourcePath?: string): boolean {
+  add(input: UsageRecord, sourcePath?: string): boolean {
+    const record = this.#mapModel(input);
     if (record.dedupeKey !== null) {
       if (this.#seen.has(record.dedupeKey)) {
         this.#duplicatesDropped += 1;
@@ -185,23 +202,15 @@ export class UsageAggregator {
       return false;
     }
 
-    const hourStart =
+    const hourIndex =
       this.#hourlyWindow === null
-        ? ""
-        : new Date(
-            this.#hourlyWindow.sinceTimeMs +
-              Math.floor((record.timestampMs - this.#hourlyWindow.sinceTimeMs) / HOUR_MS) * HOUR_MS,
-          ).toISOString();
-    const key = `${day}\u0000${hourStart}\u0000${record.provider}\u0000${record.model}\u0000${sourcePath ?? ""}`;
-    let bucket = this.#buckets.get(key);
-    if (bucket === undefined) {
-      bucket = emptyBucket();
-      this.#buckets.set(key, bucket);
-    }
+        ? -1
+        : Math.floor((record.timestampMs - this.#hourlyWindow.sinceTimeMs) / HOUR_MS);
+    const bucket = this.#bucketFor(day, hourIndex, record.provider, record.model, sourcePath ?? "");
 
     const priced = priceUsage(this.#options.rates, record, this.#options.priceOverrides);
 
-    bucket.totals = addTotals(bucket.totals, record.totals);
+    accumulateTotals(bucket.totals, record.totals);
     bucket.costUsd += priced.costUsd;
     if (priced.categoryCostUsd !== null) {
       const sum = bucket.categoryCostUsd;
@@ -228,33 +237,29 @@ export class UsageAggregator {
 
     // The project and session rollups see exactly the records the day/model
     // grid saw, so all three axes always total to the same cost.
-    const contribution = { record, day, priced, savings };
-
-    // Session ids are unique across providers, so the id alone keys the row.
+    const contribution: GroupContribution = { record, day, priced, savings };
     const session =
       record.sessionId.length > 0
         ? this.#addToGroup(this.#sessions, record.sessionId, contribution)
         : undefined;
-
     // A session is attributed to the directory it started in, and every one of
     // its records follows that attribution. Claude rewrites `cwd` whenever the
     // agent changes directory mid-session, so keying projects on the raw
-    // per-record path shatters one repo into a row per subdirectory it happened
-    // to visit -- observed splitting a single session across 18 rows.
+    // per-record path shatters one repo into a row per subdirectory it visited.
     const projectPath = session?.projectPath ?? record.projectPath ?? "";
-    this.#addToGroup(this.#projects, `${record.provider} ${projectPath}`, contribution, projectPath);
+    this.#addToGroup(
+      this.#projects,
+      `${record.provider}\u0000${projectPath}`,
+      contribution,
+      projectPath,
+    );
     return true;
   }
 
   #addToGroup(
     groups: Map<string, MutableGroup>,
     key: string,
-    contribution: {
-      readonly record: UsageRecord;
-      readonly day: string;
-      readonly priced: { readonly costUsd: number; readonly costSource: UsageBucket["costSource"] };
-      readonly savings: number;
-    },
+    contribution: GroupContribution,
     projectPathOverride?: string,
   ): MutableGroup {
     const { record, day, priced, savings } = contribution;
@@ -271,7 +276,7 @@ export class UsageAggregator {
       groups.set(key, group);
     }
 
-    group.totals = addTotals(group.totals, record.totals);
+    accumulateTotals(group.totals, record.totals);
     group.costUsd += priced.costUsd;
     group.cacheSavingsUsd += savings;
     group.records += 1;
@@ -279,19 +284,56 @@ export class UsageAggregator {
     if (priced.costSource === "providerReported") group.providerReportedRecords += 1;
     if (record.sessionId.length > 0) group.sessions.add(record.sessionId);
     if (record.model.length > 0) group.models.add(record.model);
-    // Records arrive in file order, which is not chronological across a resumed
-    // session, so the span widens from both ends rather than assuming the first
-    // record seen is the oldest.
+    // File order is not chronological across a resumed session, so widen both ends.
     if (day < group.firstDay) group.firstDay = day;
     if (day > group.lastDay) group.lastDay = day;
-    // Codex declares cwd once on session_meta. A record parsed before that line
-    // carries no path, so the first one that does fills the row in. Only ever
-    // fills a blank: a later cwd must not overwrite the anchor.
+    // Codex declares cwd once on session_meta, so a record parsed before it has
+    // no path; the first one that does fills the blank, and never overwrites.
     const candidate = projectPathOverride ?? record.projectPath ?? "";
     if (group.projectPath.length === 0 && candidate.length > 0) {
       group.projectPath = candidate;
     }
     return group;
+  }
+
+  // Aliases use the target's rate, replacing provider-specific rateModel.
+  #mapModel(record: UsageRecord): UsageRecord {
+    const model = this.#options.modelAliases?.get(record.model);
+    if (model === undefined) return record;
+    const { rateModel: _rateModel, ...rest } = record;
+    return { ...rest, model };
+  }
+
+  // Time-ordered records usually reuse the previous bucket; avoid rebuilding its key.
+  #bucketFor(
+    day: string,
+    hourIndex: number,
+    provider: string,
+    model: string,
+    source: string,
+  ): MutableBucket {
+    const last = this.#lastBucket;
+    if (
+      last !== null &&
+      last.day === day &&
+      last.hourIndex === hourIndex &&
+      last.provider === provider &&
+      last.model === model &&
+      last.source === source
+    ) {
+      return last.bucket;
+    }
+    const window = this.#hourlyWindow;
+    const hourStart =
+      window === null ? "" : new Date(window.sinceTimeMs + hourIndex * HOUR_MS).toISOString();
+    const key = `${day}\u0000${hourStart}\u0000${provider}\u0000${model}\u0000${source}`;
+    let bucket = this.#buckets.get(key);
+    if (bucket === undefined) {
+      bucket = emptyBucket();
+      this.#buckets.set(key, bucket);
+    }
+    this.#lastBucket = { day, hourIndex, provider, model, source, bucket };
+    return bucket;
   }
 
   finish(): AggregateResult {
@@ -309,10 +351,9 @@ export class UsageAggregator {
         provider: provider as UsageBucket["provider"],
         model,
         ...(sourcePath === "" ? {} : { sourcePath }),
-        totals: bucket.totals,
+        totals: { ...bucket.totals },
         costUsd: bucket.costUsd,
         cacheSavingsUsd: bucket.cacheSavingsUsd,
-        // Zero and unknown figures are omitted to keep payloads small.
         ...(category === null
           ? {}
           : {
@@ -332,7 +373,6 @@ export class UsageAggregator {
         sessions: bucket.sessions.size,
       });
     }
-    // Stable ordering keeps payloads diffable and snapshot tests meaningful.
     buckets.sort(
       (a, b) =>
         a.day.localeCompare(b.day) ||
@@ -346,7 +386,7 @@ export class UsageAggregator {
       projects.push({
         projectPath: group.projectPath,
         provider: group.provider as UsageBucket["provider"],
-        totals: group.totals,
+        totals: { ...group.totals },
         costUsd: group.costUsd,
         cacheSavingsUsd: group.cacheSavingsUsd,
         costSource: resolveCostSource(group),
@@ -367,7 +407,7 @@ export class UsageAggregator {
         projectPath: group.projectPath,
         provider: group.provider as UsageBucket["provider"],
         models: [...group.models].sort(),
-        totals: group.totals,
+        totals: { ...group.totals },
         costUsd: group.costUsd,
         cacheSavingsUsd: group.cacheSavingsUsd,
         costSource: resolveCostSource(group),
@@ -392,19 +432,10 @@ export class UsageAggregator {
   }
 }
 
-/**
- * Rounds to micro-dollars. The split and speed figures need no more precision,
- * and shorter numbers keep them cheap on the wire.
- */
 function roundUsd(value: number): number {
   return Math.round(value * 1e6) / 1e6;
 }
 
-/**
- * A bucket mixes records from one model, but their cost provenance can differ
- * when only some records carried a reported cost. The weakest provenance in the
- * bucket wins so the UI never overstates confidence.
- */
 function resolveCostSource(bucket: MutableBucket): UsageBucket["costSource"] {
   if (bucket.unpricedRecords === bucket.records) return "unpriced";
   if (bucket.providerReportedRecords === bucket.records) return "providerReported";

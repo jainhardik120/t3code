@@ -21,7 +21,7 @@ import type {
   OrchestrationV2ThreadShell,
   ResourceTelemetryProcess,
 } from "@t3tools/contracts";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -211,7 +211,7 @@ export const make = Effect.fn("makeAgentActivity")(function* () {
   const telemetry = yield* ResourceTelemetry.ResourceTelemetry;
   const hostResources = yield* HostResources.HostResources;
   const fileSystem = yield* FileSystem.FileSystem;
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
   // Environments are fixed at exec, so a process identity's tag never changes.
   const tagCache = new Map<string, string | null>();
 

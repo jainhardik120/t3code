@@ -1,10 +1,11 @@
+// @effect-diagnostics nodeBuiltinImport:off - RS256 signing of the Google service-account JWT needs node:crypto.
 import * as NodeCrypto from "node:crypto";
 
 import * as Clock from "effect/Clock";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
 const DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token";
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
@@ -36,14 +37,12 @@ const decodeServiceAccountJson = Schema.decodeUnknownEffect(
 
 export const parseServiceAccount = (json: string): Effect.Effect<FcmServiceAccount, FcmError> =>
   decodeServiceAccountJson(json).pipe(
-    Effect.map(
-      (account): FcmServiceAccount => ({
-        projectId: account.project_id,
-        clientEmail: account.client_email,
-        privateKey: account.private_key,
-        tokenUri: account.token_uri ?? DEFAULT_TOKEN_URI,
-      }),
-    ),
+    Effect.map((account): FcmServiceAccount => ({
+      projectId: account.project_id,
+      clientEmail: account.client_email,
+      privateKey: account.private_key,
+      tokenUri: account.token_uri ?? DEFAULT_TOKEN_URI,
+    })),
     Effect.mapError(
       (cause) => new FcmError({ message: "Invalid FCM service-account JSON.", cause }),
     ),

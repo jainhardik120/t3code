@@ -94,10 +94,10 @@ describe("attachSessionLinks", () => {
       new Map([["linked", { threadId: "t1", threadTitle: "Fix the parser" }]]),
     );
 
-    expect(result.sessions[0]?.threadId).toBe("t1");
-    expect(result.sessions[0]?.threadTitle).toBe("Fix the parser");
+    expect(result.sessions?.[0]?.threadId).toBe("t1");
+    expect(result.sessions?.[0]?.threadTitle).toBe("Fix the parser");
     // A session started outside T3 Code has nothing to open.
-    expect(result.sessions[1]?.threadId).toBeNull();
+    expect(result.sessions?.[1]?.threadId).toBeNull();
   });
 
   it("returns the summary untouched when nothing resolves", () => {

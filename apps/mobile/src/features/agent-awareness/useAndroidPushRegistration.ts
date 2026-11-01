@@ -2,13 +2,13 @@ import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 
 import { loadOrCreateAgentAwarenessDeviceId } from "../../persistence/imperative";
-import { useEnvironments } from "../../state/environments";
+import { useAtomValue } from "@effect/atom-react";
 import { pushEnvironment } from "../../state/push";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { projectWorkspaceEnvironment } from "../../state/workspaceModel";
+import { workspaceConnections } from "../../state/workspace";
 import { configureAndroidNotificationChannel } from "./notificationSetup";
 
 // Registers this Android device's FCM token with every connected self-hosted
@@ -17,7 +17,7 @@ import { configureAndroidNotificationChannel } from "./notificationSetup";
 // no-op off Android.
 export function useAndroidPushRegistration(): void {
   const registerToken = useAtomCommand(pushEnvironment.registerToken, { reportFailure: false });
-  const { environments } = useEnvironments();
+  const environments = useAtomValue(workspaceConnections.environmentsAtom);
   // Guards against re-registering the same (environment, token) pair on every
   // render or environment-list change.
   const registeredRef = useRef(new Set<string>());
@@ -26,9 +26,9 @@ export function useAndroidPushRegistration(): void {
     if (Platform.OS !== "android") {
       return;
     }
-    const connected = environments
-      .map((environment) => projectWorkspaceEnvironment(environment.environmentId, environment))
-      .filter((environment) => environment.connectionState === "connected");
+    const connected = environments.filter(
+      (environment) => environment.connectionState === "connected",
+    );
     if (connected.length === 0) {
       return;
     }

@@ -4,7 +4,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { SqlitePersistenceMemory } from "./Layers/Sqlite.ts";
+import * as SqlitePersistence from "./Sqlite.ts";
 import { layer as pushDevicesLayer, PushDeviceRepository } from "./PushDevices.ts";
 
 const prefs = {
@@ -17,8 +17,8 @@ const prefs = {
 
 const pushLayer = it.layer(
   Layer.mergeAll(
-    pushDevicesLayer.pipe(Layer.provideMerge(SqlitePersistenceMemory)),
-    SqlitePersistenceMemory,
+    pushDevicesLayer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory)),
+    SqlitePersistence.layerMemory,
   ),
 );
 

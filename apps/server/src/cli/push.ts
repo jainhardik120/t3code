@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import { FileSystem } from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as References from "effect/References";
-import { Argument, Command, GlobalFlag } from "effect/unstable/cli";
+import { Argument, Command, GlobalFlag } from "effect/cli";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
@@ -52,7 +52,7 @@ const setFcmCredentialsCommand = Command.make("set-fcm-credentials", {
         );
       }).pipe(
         Effect.provide(
-          EnvironmentAuth.runtimeLayer.pipe(
+          EnvironmentAuth.layerRuntime.pipe(
             Layer.provide(ServerConfig.layer(config)),
             Layer.provide(Layer.succeed(References.MinimumLogLevel, "Error")),
           ),
@@ -76,7 +76,7 @@ const clearFcmCredentialsCommand = Command.make("clear-fcm-credentials", {
         yield* Console.log("Cleared FCM service-account credentials. Android push is disabled.\n");
       }).pipe(
         Effect.provide(
-          EnvironmentAuth.runtimeLayer.pipe(
+          EnvironmentAuth.layerRuntime.pipe(
             Layer.provide(ServerConfig.layer(config)),
             Layer.provide(Layer.succeed(References.MinimumLogLevel, "Error")),
           ),

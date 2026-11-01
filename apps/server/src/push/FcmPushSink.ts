@@ -11,7 +11,7 @@ import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
@@ -99,17 +99,16 @@ export const make = Effect.gen(function* () {
     );
   }).pipe(Effect.orElseSucceed(() => null));
 
-  const getAccessToken = (account: FcmServiceAccount) =>
-    Effect.gen(function* () {
-      const now = yield* Clock.currentTimeMillis;
-      const cached = yield* Ref.get(accessTokenRef);
-      if (cached && cached.expiresAtMs - 60_000 > now) {
-        return cached.accessToken;
-      }
-      const minted = yield* mintAccessToken(account).pipe(Effect.provide(FetchHttpClient.layer));
-      yield* Ref.set(accessTokenRef, minted);
-      return minted.accessToken;
-    });
+  const getAccessToken = Effect.fn("getAccessToken")(function* (account: FcmServiceAccount) {
+    const now = yield* Clock.currentTimeMillis;
+    const cached = yield* Ref.get(accessTokenRef);
+    if (cached && cached.expiresAtMs - 60_000 > now) {
+      return cached.accessToken;
+    }
+    const minted = yield* mintAccessToken(account).pipe(Effect.provide(FetchHttpClient.layer));
+    yield* Ref.set(accessTokenRef, minted);
+    return minted.accessToken;
+  });
 
   const sendToDevice = (input: {
     readonly account: FcmServiceAccount;
