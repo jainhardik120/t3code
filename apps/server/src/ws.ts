@@ -114,6 +114,8 @@ import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
+import * as AgentActivity from "./orchestration-v2/AgentActivity.ts";
+import * as BackgroundCommandOutput from "./orchestration-v2/BackgroundCommandOutput.ts";
 import * as ThreadManagementService from "./orchestration-v2/ThreadManagementService.ts";
 import * as CommandOutputHub from "./orchestration-v2/CommandOutputHub.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
@@ -287,6 +289,7 @@ import * as AgentSessionImporter from "./project/AgentSessionImporter.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 
 const CONFIG_DISCOVERY_TIMEOUT = Duration.seconds(5);
+const AGENT_ACTIVITY_INTERVAL = Duration.seconds(3);
 const isProviderUploadFeedbackError = Schema.is(ProviderUploadFeedbackError);
 
 const resolveDiscoveryForConfig = <A, E, R>(
@@ -1419,6 +1422,8 @@ export const layerWsRpc = (
       const hostResources = yield* HostResources.HostResources;
       const processResourceMonitor = yield* ProcessResourceMonitor.ProcessResourceMonitor;
       const resourceTelemetry = yield* ResourceTelemetry.ResourceTelemetry;
+      const agentActivity = yield* AgentActivity.AgentActivity;
+      const backgroundCommandOutput = yield* BackgroundCommandOutput.BackgroundCommandOutput;
       const providerSessionRuntime = yield* ProviderSessionRuntime.ProviderSessionRuntimeRepository;
       const relayClient = yield* RelayClient.RelayClient;
       const pushDevices = yield* PushDevices.PushDeviceRepository;
@@ -2004,6 +2009,20 @@ export const layerWsRpc = (
           threadManagement.forceStopThread(input),
         [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: (input) =>
           readWorkflowScript({ scriptPath: input.scriptPath }),
+        [ORCHESTRATION_V2_WS_METHODS.getBackgroundCommandOutput]: (input) =>
+          backgroundCommandOutput.read(input).pipe(
+            Effect.mapError(
+              (cause) =>
+                new OrchestrationV2GetThreadProjectionError({
+                  threadId: input.threadId,
+                  message:
+                    cause.reason === "not-background"
+                      ? "This command did not run in the background."
+                      : "Could not read the background command's output.",
+                  cause,
+                }),
+            ),
+          ),
         [ORCHESTRATION_V2_WS_METHODS.getTurnItem]: (input) =>
           threadManagement.getTurnItem(input).pipe(
             Effect.mapError(
@@ -2632,8 +2651,8 @@ export const layerWsRpc = (
         [WS_METHODS.serverCheckOtlpEndpoint]: (input) => otlpEndpointCheck.check(input),
         [WS_METHODS.serverPrepareTriage]: (input) => triage.prepare(input),
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
-        [WS_METHODS.pushRegisterToken]: (input) =>
-          Effect.gen(function* () {
+        [WS_METHODS.pushRegisterToken]: Effect.fn("ws.pushRegisterToken")(
+          function* (input) {
             const now = yield* DateTime.now;
             yield* pushDevices.upsert({
               deviceId: input.deviceId,
@@ -2646,15 +2665,14 @@ export const layerWsRpc = (
               now,
             });
             return { registered: true };
-          }).pipe(
-            Effect.mapError(
-              (cause) =>
-                new PushRegistrationError({
-                  message:
-                    cause instanceof Error ? cause.message : "Failed to register push token.",
-                }),
-            ),
+          },
+          Effect.mapError(
+            (cause) =>
+              new PushRegistrationError({
+                message: cause instanceof Error ? cause.message : "Failed to register push token.",
+              }),
           ),
+        ),
         [WS_METHODS.pushUnregisterToken]: (input) =>
           pushDevices.deleteByDeviceId({ deviceId: input.deviceId }).pipe(
             Effect.map((unregistered) => ({ unregistered })),
@@ -3370,6 +3388,14 @@ export const layerWsRpc = (
                 liveEvents,
               );
             }),
+          ),
+        [WS_METHODS.subscribeAgentActivity]: (_input) =>
+          // A failed sample (telemetry restarting) skips that tick instead of ending the stream.
+          Stream.tick(AGENT_ACTIVITY_INTERVAL).pipe(
+            Stream.mapEffect(() => Effect.option(agentActivity.read)),
+            Stream.filterMap(
+              Option.match({ onNone: () => Result.failVoid, onSome: Result.succeed }),
+            ),
           ),
         [WS_METHODS.subscribeResourceTelemetry]: (_input) =>
           Stream.unwrap(

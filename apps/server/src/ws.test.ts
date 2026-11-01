@@ -121,6 +121,8 @@ import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import * as PushDevices from "./persistence/PushDevices.ts";
 import * as ProviderSessionRuntime from "./persistence/ProviderSessionRuntime.ts";
 import * as ChatGptConnector from "./chatgpt/ChatGptConnector.ts";
+import * as AgentActivity from "./orchestration-v2/AgentActivity.ts";
+import * as BackgroundCommandOutput from "./orchestration-v2/BackgroundCommandOutput.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ProjectEnrichment from "./project/ProjectEnrichmentService.ts";
 import * as ProjectService from "./project/ProjectService.ts";
@@ -763,6 +765,8 @@ it.effect(
           Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
           Layer.mock(ServerBrowser.ServerBrowser)({}),
           Layer.mock(ChatGptConnector.ChatGptConnector)({}),
+          Layer.mock(AgentActivity.AgentActivity)({}),
+          Layer.mock(BackgroundCommandOutput.BackgroundCommandOutput)({}),
           Layer.mock(PushDevices.PushDeviceRepository)({}),
           Layer.mock(ProviderSessionRuntime.ProviderSessionRuntimeRepository)({}),
         ),
@@ -923,6 +927,8 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
         Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
         Layer.mock(ServerBrowser.ServerBrowser)({}),
         Layer.mock(ChatGptConnector.ChatGptConnector)({}),
+        Layer.mock(AgentActivity.AgentActivity)({}),
+        Layer.mock(BackgroundCommandOutput.BackgroundCommandOutput)({}),
         Layer.mock(PushDevices.PushDeviceRepository)({}),
         Layer.mock(ProviderSessionRuntime.ProviderSessionRuntimeRepository)({}),
       ),

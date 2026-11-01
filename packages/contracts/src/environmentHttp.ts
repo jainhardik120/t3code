@@ -49,6 +49,7 @@ import {
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
 import {
+  OrchestrationV2ForceStopThreadResult,
   OrchestrationV2ShellSnapshot,
   OrchestrationV2ThreadBoundedSnapshot,
   OrchestrationV2ThreadDetailSnapshot,
@@ -56,6 +57,7 @@ import {
   OrchestrationV2ThreadTranscript,
 } from "./orchestrationV2.ts";
 import { AgentActivitySnapshot } from "./agentActivity.ts";
+import { ServerSignalProcessInput, ServerSignalProcessResult } from "./server.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import {
   PullRequestDiffInput,
@@ -684,6 +686,26 @@ class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestration")
     HttpApiEndpoint.get("activity", "/api/orchestration/activity", {
       headers: OptionalBearerHeaders,
       success: AgentActivitySnapshot,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "activityStopThread",
+      "/api/orchestration/activity/threads/:threadId/stop",
+      {
+        headers: OptionalBearerHeaders,
+        params: EnvironmentOrchestrationThreadSnapshotParams,
+        success: OrchestrationV2ForceStopThreadResult,
+        error: EnvironmentOrchestrationThreadSnapshotErrors,
+      },
+    ).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("activitySignalProcess", "/api/orchestration/activity/processes/signal", {
+      headers: OptionalBearerHeaders,
+      payload: ServerSignalProcessInput,
+      success: ServerSignalProcessResult,
       error: EnvironmentOrchestrationSnapshotErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   )

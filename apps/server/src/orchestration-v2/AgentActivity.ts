@@ -1,16 +1,6 @@
-/**
- * Live view of what agents are doing: running threads, their background work,
- * and the CPU/memory of the processes each thread owns.
- *
- * Adapters that run one provider process per thread (Claude) launch it with
- * `T3CODE_THREAD_ID` in its environment. Shared provider servers (Codex
- * app-server, OpenCode) serve many threads, so they stay untagged and count
- * as shared. Everything the agent spawns (shell commands, dev servers,
- * subagent CLIs) inherits it, so reading `/proc/<pid>/environ` attributes a
- * whole process tree to its thread without the adapters tracking PIDs. A
- * process without the variable inherits its parent's thread. Where `/proc`
- * is unavailable (macOS, Windows) every child process is unattributed.
- */
+// Per-thread processes: the Claude adapter sets T3CODE_THREAD_ID on its CLI, every descendant
+// inherits it, and /proc/<pid>/environ reveals it. Shared provider servers (Codex app-server,
+// OpenCode) stay untagged. Without /proc (macOS, Windows) nothing is attributed.
 import type {
   AgentActivityProcess,
   AgentActivitySnapshot,
@@ -32,9 +22,10 @@ import * as Schema from "effect/Schema";
 import * as HostResources from "../resourceTelemetry/HostResources.ts";
 import * as ResourceTelemetry from "../resourceTelemetry/ResourceTelemetry.ts";
 import * as ProjectStore from "./ProjectStore.ts";
+import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 
-export const AGENT_THREAD_ENV_VAR = "T3CODE_THREAD_ID";
+const AGENT_THREAD_ENV_VAR = "T3CODE_THREAD_ID";
 
 export class AgentActivityReadError extends Schema.TaggedError<AgentActivityReadError>()(
   "AgentActivityReadError",
@@ -126,6 +117,7 @@ export function buildAgentActivitySnapshot(input: {
   readonly projects: ReadonlyArray<OrchestrationProjectShell>;
   readonly processes: ReadonlyArray<ResourceTelemetryProcess>;
   readonly tags: ReadonlyMap<number, string | null>;
+  readonly sessions: ReadonlyArray<ProviderSessionManager.LiveProviderSession>;
 }): AgentActivitySnapshot {
   const counted = input.processes.filter((process) => COUNTED_CATEGORIES.has(process.category));
   const owners = attributeProcesses(counted, input.tags);
@@ -145,11 +137,16 @@ export function buildAgentActivitySnapshot(input: {
     owned.set(owner, list);
   }
 
+  // A shared session (Codex app-server) lists every thread it serves.
+  const sessionByThread = new Map(
+    input.sessions.flatMap((session) => session.threadIds.map((id) => [id, session] as const)),
+  );
   const projectTitles = new Map(input.projects.map((project) => [project.id, project.title]));
   const threads: AgentActivityThread[] = [];
   for (const thread of input.threads) {
     const processes = owned.get(thread.id) ?? [];
-    if (!isActiveThread(thread) && processes.length === 0) continue;
+    const session = sessionByThread.get(thread.id);
+    if (!isActiveThread(thread) && processes.length === 0 && session === undefined) continue;
     const usage = emptyUsage();
     for (const process of processes) addUsage(usage, process);
     const ownedPids = new Set(processes.map((process) => process.identity.pid));
@@ -175,11 +172,21 @@ export function buildAgentActivitySnapshot(input: {
       runStartedAt: thread.activityRunStartedAt ?? thread.latestRunStartedAt ?? null,
       waitingOnUser: thread.pendingRuntimeRequest !== null,
       backgroundTasks: thread.pendingBackgroundTasks ?? [],
+      session:
+        session === undefined
+          ? null
+          : {
+              busy: session.busy,
+              releaseAt:
+                session.releaseAtMs === null ? null : DateTime.makeUnsafe(session.releaseAtMs),
+              pinned: session.pinned,
+            },
       usage: roundUsage(usage),
       processes: processes
         .toSorted((left, right) => left.identity.startTimeMs - right.identity.startTimeMs)
         .map((process): AgentActivityProcess => ({
           pid: process.identity.pid,
+          startTimeMs: process.identity.startTimeMs,
           ppid: process.ppid,
           depth: depthOf(process),
           name: process.name,
@@ -205,11 +212,12 @@ export function buildAgentActivitySnapshot(input: {
   };
 }
 
-export const make = Effect.fn("makeAgentActivity")(function* () {
+const make = Effect.fn("makeAgentActivity")(function* () {
   const threadManagement = yield* ThreadManagementService.ThreadManagementService;
   const projectStore = yield* ProjectStore.ProjectStoreV2;
   const telemetry = yield* ResourceTelemetry.ResourceTelemetry;
   const hostResources = yield* HostResources.HostResources;
+  const providerSessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
   const fileSystem = yield* FileSystem.FileSystem;
   const platform = yield* HostProcess.Platform;
   // Environments are fixed at exec, so a process identity's tag never changes.
@@ -241,11 +249,12 @@ export const make = Effect.fn("makeAgentActivity")(function* () {
       );
       for (const key of tagCache.keys()) if (!live.has(key)) tagCache.delete(key);
     }
-    const [shell, projects, host, readAt] = yield* Effect.all([
+    const [shell, projects, host, readAt, sessions] = yield* Effect.all([
       threadManagement.getShellSnapshot({ location: "active" }),
       projectStore.listShells(),
       hostResources.read,
       DateTime.now,
+      providerSessions.liveSessions,
     ]);
     return buildAgentActivitySnapshot({
       readAt,
@@ -254,6 +263,7 @@ export const make = Effect.fn("makeAgentActivity")(function* () {
       projects,
       processes: snapshot.processes,
       tags,
+      sessions,
     });
   }).pipe(Effect.mapError((cause) => new AgentActivityReadError({ cause })));
 

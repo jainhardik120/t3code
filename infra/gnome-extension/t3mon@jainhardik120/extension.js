@@ -1,8 +1,6 @@
-// T3 Monitor: panel indicator for a local T3 Code server.
-// Polls GET /api/orchestration/activity (running threads, their background work and
-// the CPU/memory of each thread's process tree). Requests are async Soup calls, so a
-// slow or stopped server never blocks the shell. Visual language follows Astra
-// Monitor and Battmon: mini graph in the panel, pill tooltip, centred-section menu.
+// T3 Monitor: GNOME panel view of GET /api/orchestration/activity. Requests are async Soup
+// calls, so a slow or stopped server never blocks the shell.
+// oxlint-disable-next-line no-unused-vars -- importing cairo registers the context methods the graphs draw with
 import Cairo from "cairo";
 import Clutter from "gi://Clutter";
 import Gio from "gi://Gio";
@@ -52,17 +50,57 @@ function fmtElapsed(iso) {
 }
 
 // Agent shells wrap each command in a snapshot loader; show the command itself.
+// Nests processes by parent pid; each node carries its subtree's CPU, memory and count.
+function buildProcessTree(processes) {
+  const pids = new Set(processes.map((p) => p.pid));
+  const childrenOf = new Map();
+  for (const p of processes) {
+    if (!pids.has(p.ppid) || p.ppid === p.pid) continue;
+    if (!childrenOf.has(p.ppid)) childrenOf.set(p.ppid, []);
+    childrenOf.get(p.ppid).push(p);
+  }
+  const build = (p, seen) => {
+    const nextSeen = new Set(seen).add(p.pid);
+    const children = (childrenOf.get(p.pid) ?? [])
+      .filter((c) => !nextSeen.has(c.pid))
+      .map((c) => build(c, nextSeen));
+    const total = { cpuPercent: p.cpuPercent, residentBytes: p.residentBytes, count: 1 };
+    for (const c of children) {
+      total.cpuPercent += c.total.cpuPercent;
+      total.residentBytes += c.total.residentBytes;
+      total.count += c.total.count;
+    }
+    return { process: p, children, total };
+  };
+  return processes
+    .filter((p) => !pids.has(p.ppid) || p.ppid === p.pid)
+    .map((p) => build(p, new Set()));
+}
+
+function isGuardProcess(proc) {
+  return proc.command.includes("kill -TERM 0") && proc.command.includes("trap ''");
+}
+
 function displayCommand(proc) {
+  if (isGuardProcess(proc)) return "T3 process guard";
   const cmd = proc.command || proc.name;
   const evaled = cmd.match(/\beval '((?:[^']|'\\'')*)'/);
   if (evaled) return `$ ${evaled[1].replace(/'\\''/g, "'")}`;
   const model = cmd.match(/--model\s+(\S+)/);
-  if (/(^|\/)claude(\s|$)/.test(cmd))
+  if (/^(\S*\/)?claude(\s|$)/.test(cmd))
     return `claude${model ? ` · ${model[1].replace(/^claude-/, "")}` : ""}`;
   const npx = cmd.match(/npm exec (\S+)/);
   if (npx) return `mcp: ${npx[1].replace(/@[^@/]*$/, "")}`;
   const [bin, ...rest] = cmd.split(/\s+/);
   return [bin.split("/").pop(), ...rest].join(" ");
+}
+
+function fmtRelease(thread) {
+  const at = Date.parse(thread.session?.releaseAt ?? "");
+  if (!Number.isFinite(at) || thread.session?.busy) return null;
+  const minutes = Math.max(0, Math.round((at - Date.now()) / 60000));
+  const when = minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
+  return thread.session.pinned ? `held for background, ≤${when}` : `warm, releases in ${when}`;
 }
 
 function threadState(thread) {
@@ -204,6 +242,7 @@ const Indicator = GObject.registerClass(
       this._config = { ...DEFAULT_CONFIG };
       this._history = [];
       this._expanded = new Set();
+      this._expandedProcesses = new Map();
       this._snapshot = null;
       this._error = null;
       this._environmentId = null;
@@ -233,7 +272,7 @@ const Indicator = GObject.registerClass(
       this._buildMenu();
       this.menu.connect("open-state-changed", (_m, open) => {
         if (open) {
-          this._tooltip.close(false);
+          this._tooltip.hide();
           this._renderMenu();
         }
       });
@@ -262,8 +301,16 @@ const Indicator = GObject.registerClass(
       this._config.webUrl = (this._config.webUrl || this._config.serverUrl).replace(/\/+$/, "");
     }
 
-    async _get(path) {
-      const msg = Soup.Message.new("GET", `${this._config.serverUrl}${path}`);
+    async _get(path, body) {
+      const msg = Soup.Message.new(
+        body === undefined ? "GET" : "POST",
+        `${this._config.serverUrl}${path}`,
+      );
+      if (body !== undefined)
+        msg.set_request_body_from_bytes(
+          "application/json",
+          new GLib.Bytes(new TextEncoder().encode(JSON.stringify(body))),
+        );
       if (this._config.token)
         msg.request_headers.append("Authorization", `Bearer ${this._config.token}`);
       const bytes = await this._session.send_and_read_async(
@@ -281,6 +328,13 @@ const Indicator = GObject.registerClass(
         throw new Error(reason);
       }
       return JSON.parse(text);
+    }
+
+    // Fire-and-refresh: the next snapshot shows whether the process went away.
+    _post(path, body) {
+      this._get(path, body)
+        .catch((e) => Main.notify("T3 Monitor", `Request failed: ${e.message}`))
+        .finally(() => this._refresh());
     }
 
     async _refresh() {
@@ -341,27 +395,38 @@ const Indicator = GObject.registerClass(
       this._setTooltip(tip.join(" | "));
     }
 
-    // Hover pill, same construction as Astra's header tooltips.
+    // Hover pill. A plain, non-reactive label: a popup menu here took the pointer as it opened
+    // and closed, which left the panel button stuck in its hover state.
     _buildTooltip() {
-      this._tooltip = new PopupMenu.PopupMenu(this, 0.5, St.Side.TOP);
-      Main.uiGroup.add_child(this._tooltip.actor);
-      this._tooltip.actor.hide();
-      this._tooltipItem = new PopupMenu.PopupMenuItem("", {
-        reactive: true,
-        style_class: "t3mon-tooltip-item",
+      this._tooltip = new St.Label({
+        style_class: "t3mon-tooltip",
+        reactive: false,
+        visible: false,
       });
-      this._tooltipItem.actor.x_expand = true;
-      this._tooltipItem.actor.x_align = Clutter.ActorAlign.CENTER;
-      this._tooltip.addMenuItem(this._tooltipItem);
-      this.connect("enter-event", () => {
-        if (!this.menu.isOpen && this._tooltipItem.label.text) this._tooltip.open(false);
-      });
-      this.connect("leave-event", () => this._tooltip.close(false));
+      Main.uiGroup.add_child(this._tooltip);
+      this.connect("notify::hover", () => this._syncTooltip());
+    }
+
+    _syncTooltip() {
+      if (!this.hover || this.menu.isOpen || !this._tooltip.text) {
+        this._tooltip.hide();
+        return;
+      }
+      const [x, y] = this.get_transformed_position();
+      const [width, height] = this.get_transformed_size();
+      this._tooltip.show();
+      const monitor = Main.layoutManager.findMonitorForActor(this);
+      const maxX = monitor ? monitor.x + monitor.width - this._tooltip.width : x;
+      const left = Math.max(
+        monitor?.x ?? 0,
+        Math.min(maxX, Math.floor(x + width / 2 - this._tooltip.width / 2)),
+      );
+      this._tooltip.set_position(left, Math.floor(y + height + 6));
     }
 
     _setTooltip(text) {
-      this._tooltipItem.label.text = text;
-      this._tooltip.actor.set_width(this._tooltipItem.get_preferred_width(-1)[1] + 30);
+      this._tooltip.text = text;
+      if (this._tooltip.visible) this._syncTooltip();
     }
 
     _buildMenu() {
@@ -588,6 +653,8 @@ const Indicator = GObject.registerClass(
       if (thread.usage.processCount)
         meta.push(`${thread.usage.processCount} proc${thread.usage.processCount === 1 ? "" : "s"}`);
       if (thread.backgroundTasks.length) meta.push(`${thread.backgroundTasks.length} background`);
+      const release = fmtRelease(thread);
+      if (release && thread.runStatus === null) meta[2] = release;
       const metaRow = new St.BoxLayout({ x_expand: true });
       const metaLabel = new St.Label({
         text: meta.filter(Boolean).join("  ·  "),
@@ -608,6 +675,22 @@ const Indicator = GObject.registerClass(
         });
         metaRow.add_child(open);
       }
+      if (thread.usage.processCount || thread.session) {
+        const stop = new St.Button({
+          label: "Stop",
+          style_class: "t3mon-open t3mon-stop",
+          can_focus: true,
+        });
+        stop.connect("clicked", () => {
+          stop.label = "Stopping…";
+          stop.reactive = false;
+          this._post(
+            `/api/orchestration/activity/threads/${encodeURIComponent(thread.threadId)}/stop`,
+            {},
+          );
+        });
+        metaRow.add_child(stop);
+      }
       body.add_child(metaRow);
 
       if (expanded) body.add_child(this._threadDetail(thread));
@@ -622,32 +705,72 @@ const Indicator = GObject.registerClass(
       });
       if (thread.processes.length) {
         detail.add_child(new St.Label({ text: "PROCESSES", style_class: "t3mon-detail-header" }));
-        const procs = thread.processes
-          .toSorted((a, b) => b.cpuPercent - a.cpuPercent || a.depth - b.depth)
-          .slice(0, MAX_PROCESSES)
-          .toSorted((a, b) => thread.processes.indexOf(a) - thread.processes.indexOf(b));
-        for (const p of procs) {
+        // Collapsed past the agent's direct children; clicking a row overrides that.
+        const rows = [];
+        const walk = (nodes, treeDepth) => {
+          for (const node of nodes) {
+            const key = `${node.process.pid}:${node.process.startTimeMs}`;
+            const expanded = this._expandedProcesses.get(key) ?? treeDepth < 1;
+            rows.push({ node, key, treeDepth, expanded });
+            if (expanded) walk(node.children, treeDepth + 1);
+          }
+        };
+        walk(buildProcessTree(thread.processes), 0);
+        for (const { node, key, treeDepth, expanded } of rows.slice(0, MAX_PROCESSES)) {
+          const p = node.process;
+          const hasChildren = node.children.length > 0;
+          const showTotal = hasChildren && !expanded;
           const row = new St.BoxLayout({ style_class: "t3mon-proc", x_expand: true });
-          const indent = "  ".repeat(Math.min(p.depth, 6));
           const name = new St.Label({
-            text: `${indent}${p.depth ? "└ " : ""}${displayCommand(p)}`,
+            text: `${"  ".repeat(Math.min(treeDepth, 6))}${hasChildren ? (expanded ? "▾ " : "▸ ") : "  "}${displayCommand(p)}`,
             style_class: "t3mon-proc-name",
             x_expand: true,
           });
           name.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-          row.add_child(name);
-          row.add_child(
-            new St.Label({
-              text: `${fmtCpu(p.cpuPercent).padStart(5)} ${fmtBytes(p.residentBytes).padStart(7)}`,
-              style_class: "t3mon-proc-usage",
-            }),
-          );
+          const usage = new St.Label({
+            text: showTotal
+              ? `${fmtCpu(node.total.cpuPercent).padStart(5)} ${fmtBytes(node.total.residentBytes).padStart(7)} ×${node.total.count}`
+              : `${fmtCpu(p.cpuPercent).padStart(5)} ${fmtBytes(p.residentBytes).padStart(7)}`,
+            style_class: "t3mon-proc-usage",
+          });
+          if (hasChildren) {
+            const toggle = new St.Button({
+              style_class: "t3mon-proc-toggle",
+              x_expand: true,
+              can_focus: true,
+              child: name,
+            });
+            toggle.connect("clicked", () => {
+              this._expandedProcesses.set(key, !expanded);
+              this._renderMenu();
+            });
+            row.add_child(toggle);
+          } else {
+            row.add_child(name);
+          }
+          row.add_child(usage);
+          if (!isGuardProcess(p)) {
+            const kill = new St.Button({
+              label: "✕",
+              style_class: "t3mon-proc-kill",
+              can_focus: true,
+            });
+            kill.connect("clicked", () => {
+              kill.reactive = false;
+              this._post("/api/orchestration/activity/processes/signal", {
+                pid: p.pid,
+                startTimeMs: p.startTimeMs,
+                signal: "SIGINT",
+              });
+            });
+            row.add_child(kill);
+          }
           detail.add_child(row);
         }
-        if (thread.processes.length > procs.length) {
+        if (rows.length > MAX_PROCESSES) {
           detail.add_child(
             new St.Label({
-              text: `+ ${thread.processes.length - procs.length} more`,
+              text: `+ ${rows.length - MAX_PROCESSES} more`,
               style_class: "t3mon-task",
             }),
           );

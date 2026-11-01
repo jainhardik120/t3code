@@ -3562,6 +3562,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   stopWorkflow: "orchestration.stopWorkflow",
   forceStopThread: "orchestration.forceStopThread",
   getTurnItem: "orchestration.getTurnItem",
+  getBackgroundCommandOutput: "orchestration.getBackgroundCommandOutput",
   launchThread: "orchestration.launchThread",
   subscribeShell: "orchestration.subscribeShell",
   subscribeThread: "orchestration.subscribeThread",
@@ -4038,6 +4039,24 @@ export const OrchestrationV2GetTurnItemInput = Schema.Struct({
 });
 export type OrchestrationV2GetTurnItemInput = typeof OrchestrationV2GetTurnItemInput.Type;
 
+/** Live output file of a backgrounded agent command (Claude's run_in_background). */
+export const OrchestrationV2GetBackgroundCommandOutputInput = Schema.Struct({
+  threadId: ThreadId,
+  itemId: TurnItemId,
+});
+export type OrchestrationV2GetBackgroundCommandOutputInput =
+  typeof OrchestrationV2GetBackgroundCommandOutputInput.Type;
+
+export const OrchestrationV2GetBackgroundCommandOutputResult = Schema.Struct({
+  path: Schema.String,
+  /** The file's tail; `truncated` when older output was cut. */
+  text: Schema.String,
+  sizeBytes: NonNegativeInt,
+  truncated: Schema.Boolean,
+});
+export type OrchestrationV2GetBackgroundCommandOutputResult =
+  typeof OrchestrationV2GetBackgroundCommandOutputResult.Type;
+
 export const OrchestrationV2GetTurnItemResult = Schema.Struct({
   item: Schema.NullOr(OrchestrationV2TurnItem),
 });
@@ -4176,6 +4195,10 @@ export const OrchestrationV2RpcSchemas = {
   getWorkflowScript: {
     input: OrchestrationV2GetWorkflowScriptInput,
     output: OrchestrationV2GetWorkflowScriptResult,
+  },
+  getBackgroundCommandOutput: {
+    input: OrchestrationV2GetBackgroundCommandOutputInput,
+    output: OrchestrationV2GetBackgroundCommandOutputResult,
   },
   getTurnItem: {
     input: OrchestrationV2GetTurnItemInput,

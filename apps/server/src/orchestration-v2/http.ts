@@ -1,4 +1,6 @@
 import {
+  AuthEnvironmentMaintainScope,
+  AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   EnvironmentHttpApi,
   type OrchestrationProjectShell,
@@ -30,6 +32,7 @@ import {
   THREAD_HISTORY_PAGE_POLICY,
   OLDER_THREAD_USER_TURN_LIMIT,
 } from "./threadHistoryPaging.ts";
+import * as ProcessDiagnostics from "../diagnostics/ProcessDiagnostics.ts";
 import * as AgentActivity from "./AgentActivity.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ProjectStore from "./ProjectStore.ts";
@@ -61,6 +64,7 @@ export const layer = HttpApiBuilder.group(
     const projectEnrichment = yield* ProjectEnrichmentService.ProjectEnrichmentService;
     // Optional so embedders and tests that serve orchestration HTTP need not run telemetry.
     const agentActivity = yield* Effect.serviceOption(AgentActivity.AgentActivity);
+    const processDiagnostics = yield* Effect.serviceOption(ProcessDiagnostics.ProcessDiagnostics);
 
     const enrichProjectShells = Effect.fn("http.orchestration.enrichProjectShells")(
       (projects: ReadonlyArray<OrchestrationProjectShell>) =>
@@ -179,6 +183,34 @@ export const layer = HttpApiBuilder.group(
               failEnvironmentInternal("orchestration_snapshot_failed", cause),
             ),
           );
+        }),
+      )
+      .handle(
+        "activityStopThread",
+        Effect.fn("environment.orchestration.activityStopThread")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationOperateScope);
+          return yield* threadManagement
+            .forceStopThread({ threadId: args.params.threadId })
+            .pipe(
+              Effect.catch((cause) =>
+                failEnvironmentInternal("orchestration_snapshot_failed", cause),
+              ),
+            );
+        }),
+      )
+      .handle(
+        "activitySignalProcess",
+        Effect.fn("environment.orchestration.activitySignalProcess")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthEnvironmentMaintainScope);
+          if (Option.isNone(processDiagnostics)) {
+            return yield* failEnvironmentInternal(
+              "orchestration_snapshot_failed",
+              new Error("Process diagnostics are not available on this server."),
+            );
+          }
+          return yield* processDiagnostics.value.signal(args.payload);
         }),
       )
       .handle(

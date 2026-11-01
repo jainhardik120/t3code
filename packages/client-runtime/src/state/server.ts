@@ -1332,6 +1332,11 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.subscribeResourceTelemetry,
       idleTtlMs: 0,
     }),
+    agentActivity: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:agent-activity",
+      tag: WS_METHODS.subscribeAgentActivity,
+      idleTtlMs: 0,
+    }),
     resourceTelemetryHistory: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:server:resource-telemetry-history",
       tag: WS_METHODS.serverGetResourceTelemetryHistory,
@@ -1379,13 +1384,11 @@ export function createServerEnvironmentAtoms<R, E>(
     // non-idempotent action. `run` resolves with the final (done) event.
     chatgptSend: createRuntimeCommand(runtime, {
       label: "environment-data:server:chatgpt-send",
-      execute: (
-        input: {
-          readonly environmentId: EnvironmentId;
-          readonly input: ChatGptSendInput;
-          readonly onEvent: (event: ChatGptSendEvent) => void;
-        },
-      ) =>
+      execute: (input: {
+        readonly environmentId: EnvironmentId;
+        readonly input: ChatGptSendInput;
+        readonly onEvent: (event: ChatGptSendEvent) => void;
+      }) =>
         // Drained here rather than held as an atom: `onEvent` already carries
         // each event to the composer as it arrives, so the command only needs
         // to resolve with the last one.

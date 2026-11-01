@@ -17,7 +17,7 @@ import {
 } from "@t3tools/shared/shellCommand";
 import * as DateTime from "effect/DateTime";
 import { CheckIcon, ChevronRightIcon, CopyIcon, FolderIcon } from "lucide-react";
-import { Suspense, use, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, use, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
@@ -25,7 +25,9 @@ import { useRenderedAppearance } from "../../hooks/useTheme";
 import { resolveDiffThemeName } from "../../lib/diffRendering";
 import { getSyntaxHighlighterPromise } from "../../lib/syntaxHighlighting";
 import { cn } from "../../lib/utils";
+import { orchestrationEnvironment } from "../../state/orchestration";
 import { useTurnItemDetail } from "../../state/queries";
+import { useEnvironmentQuery } from "../../state/query";
 import type { TurnItemSource } from "./timelineRowContext";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -43,7 +45,6 @@ interface CommandDetailsDialogProps {
   readonly onClose: () => void;
 }
 
-// oxlint-disable-next-line no-control-regex -- matching ANSI escapes is the point
 const ANSI_PATTERN = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*\u0007/g;
 
 /** Claude stores Bash results as a JSON envelope; show its streams, not the wrapper. */
@@ -63,6 +64,40 @@ function readCommandOutput(raw: string): { stdout: string; stderr: string } {
     }
   }
   return { stdout: raw, stderr: "" };
+}
+
+const BACKGROUND_NOTICE = /Output is being written to: \/\S+\.output\b/;
+const BACKGROUND_REFRESH_MS = 2_000;
+
+function outputStreams(raw: string) {
+  const { stdout, stderr } = readCommandOutput(raw);
+  return { stdout: stdout.replace(ANSI_PATTERN, ""), stderr: stderr.replace(ANSI_PATTERN, "") };
+}
+
+function outputSections(parsed: ParsedShellCommand, streams: ReturnType<typeof outputStreams>) {
+  const stdoutSections =
+    streams.stdout.length > 0 ? splitShellOutputSections(parsed, streams.stdout) : [];
+  return streams.stderr.trim().length > 0
+    ? [...stdoutSections, { title: "stderr", marker: "stderr", text: streams.stderr }]
+    : stdoutSections;
+}
+
+function highlightCodeHtml(
+  highlighter: Awaited<ReturnType<typeof getSyntaxHighlighterPromise>>,
+  code: string,
+  language: string,
+  theme: string,
+): string {
+  try {
+    return highlighter.codeToHtml(code, { lang: language, theme });
+  } catch {
+    return highlighter.codeToHtml(code, { lang: "text", theme });
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 function formatDuration(
@@ -105,26 +140,33 @@ export function CommandDetailsDialog({
   );
   const fetchedItem = detail.data?.item;
   const item = fetchedItem?.type === "command_execution" ? fetchedItem : wireItem;
-  const parsed = useMemo(() => parseShellCommand(item.input), [item.input]);
+  const parsed = parseShellCommand(item.input);
   const [view, setView] = useState<"parsed" | "raw">("parsed");
-  const streams = useMemo(() => {
-    const raw = item.output;
-    if (raw === undefined) return null;
-    const { stdout, stderr } = readCommandOutput(raw);
-    return { stdout: stdout.replace(ANSI_PATTERN, ""), stderr: stderr.replace(ANSI_PATTERN, "") };
-  }, [item.output]);
+  // Claude's run_in_background returns a notice; the real output keeps growing in a task file.
+  const isBackground = item.output !== undefined && BACKGROUND_NOTICE.test(item.output);
+  const background = useEnvironmentQuery(
+    isBackground
+      ? orchestrationEnvironment.backgroundCommandOutput({
+          environmentId,
+          input: { threadId: projectedItem.sourceThreadId, itemId: projectedItem.sourceItemId },
+        })
+      : null,
+  );
+  const refreshBackground = background.refresh;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- re-reads a file on the host that grows while the dialog is open
+  useEffect(() => {
+    if (!isBackground) return;
+    const timer = window.setInterval(refreshBackground, BACKGROUND_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [isBackground, refreshBackground]);
+  const backgroundText = background.data?.text;
+  const rawOutput = backgroundText ?? item.output;
+  const streams = rawOutput === undefined ? null : outputStreams(rawOutput);
   const output =
     streams === null
       ? null
       : [streams.stdout, streams.stderr].filter((text) => text.length > 0).join("\n");
-  const sections = useMemo(() => {
-    if (streams === null) return [];
-    const stdoutSections =
-      streams.stdout.length > 0 ? splitShellOutputSections(parsed, streams.stdout) : [];
-    return streams.stderr.trim().length > 0
-      ? [...stdoutSections, { title: "stderr", marker: "stderr", text: streams.stderr }]
-      : stdoutSections;
-  }, [parsed, streams]);
+  const sections = streams === null ? [] : outputSections(parsed, streams);
   const exitCode = item.exitCode;
   const running = item.status === "running" || item.status === "pending";
   const failed =
@@ -138,6 +180,14 @@ export function CommandDetailsDialog({
   const title = item.title ?? firstSummary?.summary ?? "Command";
 
   const outputRef = useRef<HTMLDivElement>(null);
+  // Follow a growing background log like a terminal, unless the reader scrolled up.
+  const followTailRef = useRef(true);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps the scroll container pinned to new output
+  useEffect(() => {
+    const element = outputRef.current;
+    if (!isBackground || backgroundText === undefined || element === null) return;
+    if (followTailRef.current) element.scrollTop = element.scrollHeight;
+  }, [isBackground, backgroundText]);
   const scrollToSection = (marker: string) => {
     const target = outputRef.current?.querySelector(`[data-marker="${CSS.escape(marker)}"]`);
     target?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -156,6 +206,9 @@ export function CommandDetailsDialog({
               <Badge variant="info">
                 <Spinner className="size-3" /> Running
               </Badge>
+            ) : isBackground ? (
+              // The tool call returned at once; the command itself keeps running detached.
+              <Badge variant="info">Running in background</Badge>
             ) : failed ? (
               <Badge variant="error">
                 {exitCode !== undefined ? `Exit ${exitCode}` : "Failed"}
@@ -165,7 +218,7 @@ export function CommandDetailsDialog({
                 {exitCode !== undefined ? `Exit ${exitCode}` : "Done"}
               </Badge>
             )}
-            {duration ? <Badge variant="outline">{duration}</Badge> : null}
+            {duration && !isBackground ? <Badge variant="outline">{duration}</Badge> : null}
             {parsed.cwd ? (
               <Badge variant="outline" title={parsed.cwd}>
                 <FolderIcon /> {displayPath(parsed.cwd, workspaceRoot)}
@@ -214,12 +267,22 @@ export function CommandDetailsDialog({
               controls={
                 output !== null ? (
                   <span className="text-xs text-muted-foreground">
-                    {output.split("\n").length} lines
+                    {background.data
+                      ? `live file · ${formatFileSize(background.data.sizeBytes)}${background.data.truncated ? " · showing the end" : ""}`
+                      : `${output.split("\n").length} lines`}
                   </span>
                 ) : null
               }
             />
-            <div ref={outputRef} className="min-h-0 flex-1 overflow-auto px-4 py-3">
+            <div
+              ref={outputRef}
+              className="min-h-0 flex-1 overflow-auto px-4 py-3"
+              onScroll={(event) => {
+                const element = event.currentTarget;
+                followTailRef.current =
+                  element.scrollHeight - element.scrollTop - element.clientHeight < 40;
+              }}
+            >
               <OutputView
                 sections={sections}
                 pending={fetches && item === wireItem && detail.isPending}
@@ -311,7 +374,7 @@ function OutputView(props: {
 function SectionHeading(props: { readonly title: string | null; readonly onClick?: () => void }) {
   const content = (
     <>
-      <span className="truncate">{props.title || "—"}</span>
+      <span className="truncate">{props.title || "(untitled)"}</span>
       <span className="h-px flex-1 bg-border/70" />
     </>
   );
@@ -472,7 +535,7 @@ function RunStepView(props: {
         <div className="flex flex-wrap items-center gap-1">
           {step.filters.map((filter, index) => (
             <Badge
-              // oxlint-disable-next-line react/no-array-index-key
+              // oxlint-disable-next-line react/no-array-index-key -- filters come from an immutable command string
               key={`f${index}`}
               variant="secondary"
               size="sm"
@@ -482,7 +545,7 @@ function RunStepView(props: {
             </Badge>
           ))}
           {badges.map((badge, index) => (
-            // oxlint-disable-next-line react/no-array-index-key
+            // oxlint-disable-next-line react/no-array-index-key -- badges come from an immutable command string
             <Badge key={`b${index}`} variant="outline" size="sm">
               {badge}
             </Badge>
@@ -551,13 +614,7 @@ function HighlightedCode(props: { readonly code: string; readonly language: stri
   const resolvedTheme = useRenderedAppearance();
   const themeName = resolveDiffThemeName(resolvedTheme);
   const highlighter = use(getSyntaxHighlighterPromise(props.language));
-  const html = useMemo(() => {
-    try {
-      return highlighter.codeToHtml(props.code, { lang: props.language, theme: themeName });
-    } catch {
-      return highlighter.codeToHtml(props.code, { lang: "text", theme: themeName });
-    }
-  }, [highlighter, props.code, props.language, themeName]);
+  const html = highlightCodeHtml(highlighter, props.code, props.language, themeName);
   return (
     <div
       className="font-mono text-xs leading-relaxed [&_.shiki]:!bg-transparent [&_pre]:whitespace-pre-wrap [&_pre]:break-words"

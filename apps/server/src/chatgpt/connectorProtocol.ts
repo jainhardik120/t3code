@@ -1,20 +1,8 @@
-/**
- * T3's view of the ChatGPT connector's socket RPC contract.
- *
- * The connector is installed and versioned separately (`~/code/chatgpt-connector`).
- * Rather than cross-import its source, T3 keeps its own mirror of the wire
- * contract — the same adapter pattern T3 uses for the Codex app-server. Method
- * names must match the connector's (`connector.*`); the wire is JSON, so the
- * connector's branded ids appear here as plain strings/numbers.
- *
- * @module chatgpt/connectorProtocol
- */
+// Mirror of the separately installed ChatGPT connector's socket RPC contract
+// (~/code/chatgpt-connector); method names must match its `connector.*`.
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
-
-/** The protocol version T3 speaks; checked against the daemon's `ping`. */
-export const EXPECTED_CONNECTOR_PROTOCOL = 1;
 
 export class ConnectorSearchError extends Schema.TaggedError<ConnectorSearchError>()(
   "SearchError",
@@ -25,10 +13,10 @@ export class ConnectorSearchError extends Schema.TaggedError<ConnectorSearchErro
   },
 ) {}
 
-export class ConnectorStoreError extends Schema.TaggedError<ConnectorStoreError>()(
-  "StoreError",
-  { detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
-) {}
+export class ConnectorStoreError extends Schema.TaggedError<ConnectorStoreError>()("StoreError", {
+  detail: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {}
 
 // ChatGPT returns timestamps as either epoch seconds or ISO strings depending on
 // the endpoint/account; accept both on the wire.

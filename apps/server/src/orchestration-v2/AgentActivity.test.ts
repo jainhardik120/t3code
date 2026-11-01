@@ -114,6 +114,7 @@ describe("buildAgentActivitySnapshot", () => {
       threads: [
         thread("running", { activityRunStatus: "running", activeRunId: "run-1" as never }),
         thread("idle-with-process"),
+        thread("idle-warm"),
         thread("idle"),
       ],
       processes: [
@@ -129,12 +130,23 @@ describe("buildAgentActivitySnapshot", () => {
         [4, "idle-with-process"],
         [5, null],
       ]),
+      sessions: [
+        {
+          providerSessionId: "session-1" as never,
+          threadIds: ["idle-warm" as never],
+          busy: false,
+          releaseAtMs: DateTime.toEpochMillis(NOW) + 60_000,
+          pinned: false,
+        },
+      ],
     });
 
     expect(snapshot.threads.map((entry) => entry.threadId)).toEqual([
       "running",
       "idle-with-process",
+      "idle-warm",
     ]);
+    expect(snapshot.threads[2]!.session?.releaseAt).toEqual(DateTime.add(NOW, { minutes: 1 }));
     const running = snapshot.threads[0]!;
     expect(running.usage).toEqual({ cpuPercent: 15, residentBytes: 2000, processCount: 2 });
     expect(running.processes.map((entry) => [entry.pid, entry.depth])).toEqual([

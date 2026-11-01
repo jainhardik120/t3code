@@ -22,6 +22,8 @@ export type AgentActivityUsage = typeof AgentActivityUsage.Type;
 
 export const AgentActivityProcess = Schema.Struct({
   pid: PositiveInt,
+  /** With pid, identifies the process for server.signalProcess. */
+  startTimeMs: NonNegativeInt,
   ppid: NonNegativeInt,
   /** Depth below the thread's root process; 0 is the provider process itself. */
   depth: NonNegativeInt,
@@ -32,6 +34,15 @@ export const AgentActivityProcess = Schema.Struct({
   runTimeMs: NonNegativeInt,
 });
 export type AgentActivityProcess = typeof AgentActivityProcess.Type;
+
+/** The provider session T3 keeps warm between turns; released after it sits idle. */
+export const AgentActivitySession = Schema.Struct({
+  busy: Schema.Boolean,
+  releaseAt: Schema.NullOr(Schema.DateTimeUtc),
+  /** Held past the idle timeout because background work is still running. */
+  pinned: Schema.Boolean,
+});
+export type AgentActivitySession = typeof AgentActivitySession.Type;
 
 export const AgentActivityThread = Schema.Struct({
   threadId: ThreadId,
@@ -47,6 +58,7 @@ export const AgentActivityThread = Schema.Struct({
   /** The agent is blocked on an approval or a question for the user. */
   waitingOnUser: Schema.Boolean,
   backgroundTasks: Schema.Array(OrchestrationV2PendingBackgroundTask),
+  session: Schema.NullOr(AgentActivitySession),
   usage: AgentActivityUsage,
   processes: Schema.Array(AgentActivityProcess),
 });

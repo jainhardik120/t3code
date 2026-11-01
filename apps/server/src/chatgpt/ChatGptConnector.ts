@@ -1,14 +1,5 @@
-/**
- * Client to the locally-installed ChatGPT connector daemon, over its Unix
- * socket. T3 drives the connector the way it drives Codex/Claude — an external
- * tool on the host — reading its mirror, search, and status.
- *
- * Each call opens a short-lived socket client; the daemon is cheap to reconnect
- * to and this keeps the service stateless. A persistent connection can come
- * later if call volume warrants it.
- *
- * @module chatgpt/ChatGptConnector
- */
+// Client to the local ChatGPT connector daemon over its Unix socket. Each call opens a
+// short-lived client, so the service stays stateless.
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -35,7 +26,7 @@ export class ChatGptConnectorError extends Data.TaggedError("ChatGptConnectorErr
   readonly cause?: unknown;
 }> {}
 
-export const connectorSocketPath = (): string => {
+const connectorSocketPath = (): string => {
   const home = process.env.HOME ?? ".";
   return process.env.CHATGPT_CONNECTOR_SOCKET ?? `${home}/.chatgpt-connector/connector.sock`;
 };
@@ -80,7 +71,7 @@ export class ChatGptConnector extends Context.Service<
   }
 >()("t3/chatgpt/ChatGptConnector") {}
 
-export const make = Effect.sync(() => {
+const make = Effect.sync(() => {
   const protocol = RpcClient.layerProtocolSocket().pipe(
     Layer.provide(NodeSocket.layerNet({ path: connectorSocketPath() })),
     Layer.provide(RpcSerialization.layerNdjson),

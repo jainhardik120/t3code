@@ -1,12 +1,5 @@
-/**
- * ChatGPT connector state.
- *
- * The connector runs as a separate daemon on the host; the server proxies to it.
- * The connector is a single local surface, so these atoms target the primary
- * environment rather than merging across every connected one.
- *
- * @module state/chatgpt
- */
+// ChatGPT connector state. The connector is one local daemon the server proxies to, so these
+// atoms target the primary environment instead of merging every connected one.
 import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-react";
 import type {
   ChatGptConversationDetail,
@@ -22,7 +15,7 @@ import type {
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { useCallback, useContext, useMemo } from "react";
+import { useContext } from "react";
 
 import { useAtomCommand } from "./use-atom-command";
 import { environmentPresentations } from "./presentation";
@@ -91,7 +84,7 @@ const searchAtom = Atom.family((key: string) =>
 );
 
 export const useChatGptSearch = (text: string, limit = 20): SearchState => {
-  const key = useMemo(() => JSON.stringify({ text: text.trim(), limit }), [text, limit]);
+  const key = JSON.stringify({ text: text.trim(), limit });
   return useAtomValue(searchAtom(key));
 };
 
@@ -120,7 +113,7 @@ const conversationsAtom = Atom.family((key: string) =>
 );
 
 export const useChatGptConversations = (limit = 100, offset = 0): ConversationsState => {
-  const key = useMemo(() => JSON.stringify({ limit, offset }), [limit, offset]);
+  const key = JSON.stringify({ limit, offset });
   return useAtomValue(conversationsAtom(key));
 };
 
@@ -136,7 +129,9 @@ const conversationAtom = Atom.family((conversationId: string) =>
     if (environmentId === null || conversationId.length === 0) {
       return { waiting: false, error: null, detail: null };
     }
-    const input = { conversationId: conversationId as ChatGptGetConversationInput["conversationId"] };
+    const input = {
+      conversationId: conversationId as ChatGptGetConversationInput["conversationId"],
+    };
     const result = get(serverEnvironment.chatgptConversation({ environmentId, input }));
     return {
       waiting: result.waiting,
@@ -150,7 +145,7 @@ export const useChatGptConversation = (conversationId: string | null): Conversat
   useAtomValue(conversationAtom(conversationId ?? ""));
 
 /** The page size the sidebar browses with — kept in sync so sends can refresh it. */
-export const CHATGPT_BROWSE_LIMIT = 200;
+const CHATGPT_BROWSE_LIMIT = 200;
 
 export interface SendResultState {
   readonly ok: boolean;
@@ -196,102 +191,103 @@ export const useChatGptSend = (): {
   const setSelectedChatId = useAtomSet(selectedChatIdAtom);
   const dispatch = useAtomCommand(serverEnvironment.chatgptSend, { reportFailure: false });
 
-  const send = useCallback(
-    async (input: {
-      readonly conversationId: string | null;
-      readonly text: string;
-    }): Promise<SendResultState> => {
-      if (environmentId === null) {
-        return { ok: false, conversationId: null, error: "No environment connected." };
-      }
-      const text = input.text.trim();
-      if (text.length === 0) return { ok: false, conversationId: null, error: "Message is empty." };
+  const send = async (input: {
+    readonly conversationId: string | null;
+    readonly text: string;
+  }): Promise<SendResultState> => {
+    if (environmentId === null) {
+      return { ok: false, conversationId: null, error: "No environment connected." };
+    }
+    const text = input.text.trim();
+    if (text.length === 0) return { ok: false, conversationId: null, error: "Message is empty." };
 
-      const sendId = ++sendCounter;
-      const mine = (prev: PendingSend | null): prev is PendingSend =>
-        prev !== null && prev.sendId === sendId;
+    const sendId = ++sendCounter;
+    const mine = (prev: PendingSend | null): prev is PendingSend =>
+      prev !== null && prev.sendId === sendId;
 
-      setPending({
-        sendId,
-        targetConversationId: input.conversationId,
-        conversationId: input.conversationId,
-        userText: text,
-        assistantText: "",
-        done: false,
-      });
-      let resolvedConversationId: string | null = input.conversationId;
+    setPending({
+      sendId,
+      targetConversationId: input.conversationId,
+      conversationId: input.conversationId,
+      userText: text,
+      assistantText: "",
+      done: false,
+    });
+    let resolvedConversationId: string | null = input.conversationId;
 
-      const result = await dispatch({
-        environmentId,
-        input: {
-          ...(input.conversationId
-            ? { conversationId: input.conversationId as NonNullable<ChatGptSendInput["conversationId"]> }
-            : {}),
-          text: text as ChatGptSendInput["text"],
-        },
-        onEvent: (event: ChatGptSendEvent) => {
-          if (event.conversationId) resolvedConversationId = event.conversationId;
-          setPending((prev) =>
-            mine(prev)
-              ? {
-                  ...prev,
-                  ...(event.content.length > 0 ? { assistantText: event.content } : {}),
-                  ...(event.conversationId ? { conversationId: event.conversationId } : {}),
-                  done: event.done,
-                }
-              : prev,
-          );
-        },
-      });
-
-      if (result._tag === "Failure") {
-        setPending((prev) => (mine(prev) ? null : prev));
-        return {
-          ok: false,
-          conversationId: null,
-          error: "Couldn’t send. Is the connector daemon running and the account signed in?",
-        };
-      }
-
-      // `dispatch` resolves once the stream completes — i.e. after the connector
-      // has re-fetched and persisted the turns. So the refreshed queries below see
-      // the new messages, and switching to a fresh chat won't flash an empty pane.
-      const finalConversationId = resolvedConversationId;
-      if (finalConversationId !== null) {
-        registry.refresh(
-          serverEnvironment.chatgptConversation({
-            environmentId,
-            input: {
-              conversationId: finalConversationId as ChatGptGetConversationInput["conversationId"],
-            },
-          }),
+    const result = await dispatch({
+      environmentId,
+      input: {
+        ...(input.conversationId
+          ? {
+              conversationId: input.conversationId as NonNullable<
+                ChatGptSendInput["conversationId"]
+              >,
+            }
+          : {}),
+        text: text as ChatGptSendInput["text"],
+      },
+      onEvent: (event: ChatGptSendEvent) => {
+        if (event.conversationId) resolvedConversationId = event.conversationId;
+        setPending((prev) =>
+          mine(prev)
+            ? {
+                ...prev,
+                ...(event.content.length > 0 ? { assistantText: event.content } : {}),
+                ...(event.conversationId ? { conversationId: event.conversationId } : {}),
+                done: event.done,
+              }
+            : prev,
         );
-      }
+      },
+    });
+
+    if (result._tag === "Failure") {
+      setPending((prev) => (mine(prev) ? null : prev));
+      return {
+        ok: false,
+        conversationId: null,
+        error: "Couldn’t send. Is the connector daemon running and the account signed in?",
+      };
+    }
+
+    // `dispatch` resolves once the stream completes — i.e. after the connector
+    // has re-fetched and persisted the turns. So the refreshed queries below see
+    // the new messages, and switching to a fresh chat won't flash an empty pane.
+    const finalConversationId = resolvedConversationId;
+    if (finalConversationId !== null) {
       registry.refresh(
-        serverEnvironment.chatgptConversations({
+        serverEnvironment.chatgptConversation({
           environmentId,
           input: {
-            limit: CHATGPT_BROWSE_LIMIT as NonNullable<ChatGptListConversationsInput["limit"]>,
-            offset: 0 as NonNullable<ChatGptListConversationsInput["offset"]>,
+            conversationId: finalConversationId as ChatGptGetConversationInput["conversationId"],
           },
         }),
       );
-      registry.refresh(serverEnvironment.chatgptOverview({ environmentId, input: undefined }));
+    }
+    registry.refresh(
+      serverEnvironment.chatgptConversations({
+        environmentId,
+        input: {
+          limit: CHATGPT_BROWSE_LIMIT as NonNullable<ChatGptListConversationsInput["limit"]>,
+          offset: 0 as NonNullable<ChatGptListConversationsInput["offset"]>,
+        },
+      }),
+    );
+    registry.refresh(serverEnvironment.chatgptOverview({ environmentId, input: undefined }));
 
-      // A brand-new chat: switch the pane to it now that it's persisted.
-      if (input.conversationId === null && finalConversationId !== null) {
-        setSelectedChatId(finalConversationId);
-      }
+    // A brand-new chat: switch the pane to it now that it's persisted.
+    if (input.conversationId === null && finalConversationId !== null) {
+      setSelectedChatId(finalConversationId);
+    }
 
-      // Keep the streamed bubbles up until the persisted refetch lands, then clear
-      // (only if a newer send hasn't taken over).
-      setPending((prev) => (mine(prev) ? { ...prev, done: true } : prev));
-      setTimeout(() => setPending((prev) => (mine(prev) ? null : prev)), 1000);
+    // Keep the streamed bubbles up until the persisted refetch lands, then clear
+    // (only if a newer send hasn't taken over).
+    setPending((prev) => (mine(prev) ? { ...prev, done: true } : prev));
+    setTimeout(() => setPending((prev) => (mine(prev) ? null : prev)), 1000);
 
-      return { ok: true, conversationId: finalConversationId, error: null };
-    },
-    [dispatch, environmentId, registry, setPending],
-  );
+    return { ok: true, conversationId: finalConversationId, error: null };
+  };
 
   return { send };
 };

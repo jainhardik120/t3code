@@ -10,7 +10,6 @@ import * as Stream from "effect/Stream";
 
 import {
   type ChatGptAccount,
-  type ChatGptConversationDetail,
   type ChatGptConversationPage,
   type ChatGptConversationSummary,
   type ChatGptGetConversationInput,
@@ -116,32 +115,33 @@ export const chatgptGetOverview: Effect.Effect<
   return { accounts: accounts.map(toAccount), status: status.map(toStatus) };
 }).pipe(Effect.mapError(toContractError));
 
-export const chatgptListConversations = (
+export const chatgptListConversations = Effect.fn("chatgptListConversations")(function* (
   input: ChatGptListConversationsInput,
-): Effect.Effect<ChatGptConversationPage, ChatGptConnectorError, ChatGptConnector> =>
-  Effect.gen(function* () {
-    const connector = yield* ChatGptConnector;
-    const page = yield* connector.listConversations(input);
-    return { items: page.items.map(toSummary), total: page.total as ChatGptConversationPage["total"] };
-  }).pipe(Effect.mapError(toContractError));
+) {
+  const connector = yield* ChatGptConnector;
+  const page = yield* connector.listConversations(input);
+  return {
+    items: page.items.map(toSummary),
+    total: page.total as ChatGptConversationPage["total"],
+  };
+}, Effect.mapError(toContractError));
 
-export const chatgptSearch = (
-  input: ChatGptSearchInput,
-): Effect.Effect<ChatGptSearchResults, ChatGptConnectorError, ChatGptConnector> =>
-  Effect.gen(function* () {
-    const connector = yield* ChatGptConnector;
-    const results = yield* connector.search(input);
-    return { hits: results.hits.map(toHit), tookMs: results.tookMs as ChatGptSearchResults["tookMs"] };
-  }).pipe(Effect.mapError(toContractError));
+export const chatgptSearch = Effect.fn("chatgptSearch")(function* (input: ChatGptSearchInput) {
+  const connector = yield* ChatGptConnector;
+  const results = yield* connector.search(input);
+  return {
+    hits: results.hits.map(toHit),
+    tookMs: results.tookMs as ChatGptSearchResults["tookMs"],
+  };
+}, Effect.mapError(toContractError));
 
-export const chatgptGetConversation = (
+export const chatgptGetConversation = Effect.fn("chatgptGetConversation")(function* (
   input: ChatGptGetConversationInput,
-): Effect.Effect<ChatGptConversationDetail, ChatGptConnectorError, ChatGptConnector> =>
-  Effect.gen(function* () {
-    const connector = yield* ChatGptConnector;
-    const detail = yield* connector.getConversation(input.conversationId);
-    return { summary: toSummary(detail.summary), messages: detail.messages.map(toMessage) };
-  }).pipe(Effect.mapError(toContractError));
+) {
+  const connector = yield* ChatGptConnector;
+  const detail = yield* connector.getConversation(input.conversationId);
+  return { summary: toSummary(detail.summary), messages: detail.messages.map(toMessage) };
+}, Effect.mapError(toContractError));
 
 export const chatgptSend = (
   input: ChatGptSendInput,
@@ -156,13 +156,11 @@ export const chatgptSend = (
             text: input.text,
           })
           .pipe(
-            Stream.map(
-              (e): ChatGptSendEvent => ({
-                content: e.content,
-                done: e.done,
-                conversationId: e.conversationId as ChatGptSendEvent["conversationId"],
-              }),
-            ),
+            Stream.map((e): ChatGptSendEvent => ({
+              content: e.content,
+              done: e.done,
+              conversationId: e.conversationId as ChatGptSendEvent["conversationId"],
+            })),
             Stream.mapError(toContractError),
           ),
       ),

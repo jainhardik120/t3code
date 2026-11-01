@@ -208,6 +208,17 @@ export interface ProviderSessionManagerV2Shape {
     readonly providerSessionId: ProviderSessionId;
     readonly threadId: ThreadId;
   }) => Effect.Effect<ReadonlyArray<ThreadId>>;
+  /** Open sessions and when their idle timer releases them, for activity monitors. */
+  readonly liveSessions: Effect.Effect<ReadonlyArray<LiveProviderSession>>;
+}
+
+export interface LiveProviderSession {
+  readonly providerSessionId: ProviderSessionId;
+  readonly threadIds: ReadonlyArray<ThreadId>;
+  readonly busy: boolean;
+  /** Null while a turn is running. Pinned sessions report the pin's hard limit. */
+  readonly releaseAtMs: number | null;
+  readonly pinned: boolean;
 }
 
 export class ProviderSessionManagerV2 extends Context.Service<
@@ -232,6 +243,7 @@ interface LiveSessionEntry {
   readonly busyTurns: ReadonlySet<string>;
   readonly idleFiber: Fiber.Fiber<void, never> | null;
   readonly pinnedSinceMs: number | null;
+  readonly idleSinceMs: number | null;
   readonly idleThreadUnloads: ReadonlyMap<ThreadId, IdleThreadUnload>;
 }
 
@@ -1217,6 +1229,7 @@ export const layerWithOptions = (
 
         yield* cancelIdleFiber(entry.idleFiber);
         const generation = entry.idleGeneration + 1;
+        const idleSinceMs = yield* Clock.currentTimeMillis;
         const idleFiber = yield* Effect.sleep(Duration.millis(idleTimeoutMs)).pipe(
           Effect.andThen(releaseIfStillIdle({ providerSessionId, generation })),
           Effect.forkIn(layerScope),
@@ -1231,6 +1244,7 @@ export const layerWithOptions = (
             ...latestEntry,
             idleGeneration: generation,
             idleFiber,
+            idleSinceMs,
             ...(options?.providerActivity === true ? { pinnedSinceMs: null } : {}),
           });
           return updated;
@@ -1438,6 +1452,7 @@ export const layerWithOptions = (
               updated.set(key, {
                 ...entry,
                 busyTurns: new Set(entry.busyTurns).add(turnKey),
+                idleSinceMs: null,
                 idleFiber: null,
                 pinnedSinceMs: null,
               });
@@ -2115,7 +2130,30 @@ export const layerWithOptions = (
         ),
       );
 
+      const liveSessions: ProviderSessionManagerV2Shape["liveSessions"] = Ref.get(sessions).pipe(
+        Effect.map((current) =>
+          [...current.entries()].map(([providerSessionId, entry]) => {
+            const busy = entry.busyTurns.size > 0;
+            const releaseAtMs = busy
+              ? null
+              : entry.pinnedSinceMs !== null
+                ? entry.pinnedSinceMs + maxIdlePinMs
+                : entry.idleSinceMs === null
+                  ? null
+                  : entry.idleSinceMs + idleTimeoutMs;
+            return {
+              providerSessionId: providerSessionId as ProviderSessionId,
+              threadIds: [...entry.attachedThreadIds],
+              busy,
+              releaseAtMs,
+              pinned: entry.pinnedSinceMs !== null,
+            };
+          }),
+        ),
+      );
+
       return ProviderSessionManagerV2.of({
+        liveSessions,
         shutdown,
         open: (input) =>
           sessionOpen.withLock(
@@ -2250,6 +2288,7 @@ export const layerWithOptions = (
                 scope: sessionScope,
                 idleGeneration: 0,
                 busyTurns: new Set(),
+                idleSinceMs: null,
                 idleFiber: null,
                 pinnedSinceMs: null,
                 idleThreadUnloads: new Map(),

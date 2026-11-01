@@ -377,6 +377,7 @@ import {
   UsageSummary,
   UsageSummaryInput,
 } from "./usage.ts";
+import { AgentActivitySnapshot } from "./agentActivity.ts";
 import {
   StorageCleanupReport,
   DatabaseStorageStatus,
@@ -647,6 +648,7 @@ export const WS_METHODS = {
   subscribeServerLifecycle: "subscribeServerLifecycle",
   subscribeAuthAccess: "subscribeAuthAccess",
   subscribeResourceTelemetry: "subscribeResourceTelemetry",
+  subscribeAgentActivity: "subscribeAgentActivity",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -1853,6 +1855,15 @@ const WsOrchestrationV2GetWorkflowScriptRpc = Rpc.make(
   },
 );
 
+const WsOrchestrationV2GetBackgroundCommandOutputRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getBackgroundCommandOutput,
+  {
+    payload: OrchestrationV2RpcSchemas.getBackgroundCommandOutput.input,
+    success: OrchestrationV2RpcSchemas.getBackgroundCommandOutput.output,
+    error: Schema.Union([OrchestrationV2GetThreadProjectionError, EnvironmentAuthorizationError]),
+  },
+);
+
 const WsOrchestrationV2GetTurnItemRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getTurnItem, {
   payload: OrchestrationV2RpcSchemas.getTurnItem.input,
   success: OrchestrationV2RpcSchemas.getTurnItem.output,
@@ -2001,51 +2012,59 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
   stream: true,
 });
 
+/** Running and warm threads with their process trees, re-sampled every few seconds. */
+const WsSubscribeAgentActivityRpc = Rpc.make(WS_METHODS.subscribeAgentActivity, {
+  payload: Schema.Struct({}),
+  success: AgentActivitySnapshot,
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
 /** Cost of one thread's current provider session. Null when it has no transcript. */
-export const WsServerGetThreadUsageCostRpc = Rpc.make(WS_METHODS.serverGetThreadUsageCost, {
+const WsServerGetThreadUsageCostRpc = Rpc.make(WS_METHODS.serverGetThreadUsageCost, {
   payload: ThreadUsageCostInput,
   success: Schema.NullOr(ThreadUsageCost),
   error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
 });
 
 /** ChatGPT connector: accounts + sync status in one call for the landing view. */
-export const WsChatgptGetOverviewRpc = Rpc.make(WS_METHODS.chatgptGetOverview, {
+const WsChatgptGetOverviewRpc = Rpc.make(WS_METHODS.chatgptGetOverview, {
   success: ChatGptOverview,
   error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
 });
 
-export const WsChatgptListConversationsRpc = Rpc.make(WS_METHODS.chatgptListConversations, {
+const WsChatgptListConversationsRpc = Rpc.make(WS_METHODS.chatgptListConversations, {
   payload: ChatGptListConversationsInput,
   success: ChatGptConversationPage,
   error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
 });
 
-export const WsChatgptGetConversationRpc = Rpc.make(WS_METHODS.chatgptGetConversation, {
+const WsChatgptGetConversationRpc = Rpc.make(WS_METHODS.chatgptGetConversation, {
   payload: ChatGptGetConversationInput,
   success: ChatGptConversationDetail,
   error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
 });
 
-export const WsChatgptSearchRpc = Rpc.make(WS_METHODS.chatgptSearch, {
+const WsChatgptSearchRpc = Rpc.make(WS_METHODS.chatgptSearch, {
   payload: ChatGptSearchInput,
   success: ChatGptSearchResults,
   error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
 });
 
-export const WsChatgptSendRpc = Rpc.make(WS_METHODS.chatgptSend, {
+const WsChatgptSendRpc = Rpc.make(WS_METHODS.chatgptSend, {
   payload: ChatGptSendInput,
   success: ChatGptSendEvent,
   error: Schema.Union([EnvironmentAuthorizationError, ChatGptConnectorError]),
   stream: true,
 });
 
-export const WsPushRegisterTokenRpc = Rpc.make(WS_METHODS.pushRegisterToken, {
+const WsPushRegisterTokenRpc = Rpc.make(WS_METHODS.pushRegisterToken, {
   payload: PushRegisterTokenInput,
   success: PushRegisterTokenResult,
   error: Schema.Union([PushRegistrationError, EnvironmentAuthorizationError]),
 });
 
-export const WsPushUnregisterTokenRpc = Rpc.make(WS_METHODS.pushUnregisterToken, {
+const WsPushUnregisterTokenRpc = Rpc.make(WS_METHODS.pushUnregisterToken, {
   payload: PushUnregisterTokenInput,
   success: PushUnregisterTokenResult,
   error: Schema.Union([PushRegistrationError, EnvironmentAuthorizationError]),
@@ -2246,11 +2265,13 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeServerLifecycleRpc,
   WsSubscribeAuthAccessRpc,
   WsSubscribeResourceTelemetryRpc,
+  WsSubscribeAgentActivityRpc,
   WsOrchestrationV2DispatchCommandRpc,
   WsOrchestrationV2GetWorkflowScriptRpc,
   WsOrchestrationV2StopWorkflowRpc,
   WsOrchestrationV2ForceStopThreadRpc,
   WsOrchestrationV2GetTurnItemRpc,
+  WsOrchestrationV2GetBackgroundCommandOutputRpc,
   WsOrchestrationV2GetTurnDiffRpc,
   WsOrchestrationV2GetFullThreadDiffRpc,
   WsOrchestrationV2SearchThreadsRpc,

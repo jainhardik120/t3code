@@ -6,7 +6,7 @@ import { isElectron } from "./env";
  * can link at the real file instead of a path that resolves to a 404 on the
  * app itself.
  */
-export const FILE_SERVER_BASE_PATH = "/files";
+const FILE_SERVER_BASE_PATH = "/files";
 
 const POSITION_SUFFIX_PATTERN = /:\d+(?::\d+)?$/;
 
@@ -14,14 +14,7 @@ function encodeAbsolutePath(absolutePath: string): string {
   return absolutePath.split("/").map(encodeURIComponent).join("/");
 }
 
-/**
- * Same-origin URL that serves `absolutePath`, or null when the file server
- * cannot serve it.
- *
- * Returns null in the desktop app: there the file lives on the same machine as
- * the UI and opening it in the editor is strictly better than downloading it
- * from a server the desktop build has no reason to be behind.
- */
+/** Same-origin file-server URL for `absolutePath`, or null (always in desktop, where the editor is better). */
 export function fileServerHref(absolutePath: string): string | null {
   if (isElectron) return null;
   // POSIX absolute paths only -- Windows and relative paths are not addressable
