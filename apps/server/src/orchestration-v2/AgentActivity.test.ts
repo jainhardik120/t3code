@@ -9,7 +9,10 @@ import * as DateTime from "effect/DateTime";
 import {
   attributeProcesses,
   buildAgentActivitySnapshot,
+  parseProcStat,
+  procStartTimeMs,
   threadTagFromEnviron,
+  withScopeOwners,
 } from "./AgentActivity.ts";
 
 const NOW = DateTime.makeUnsafe("2026-11-01T06:00:00.000Z");
@@ -80,6 +83,22 @@ describe("threadTagFromEnviron", () => {
   });
 });
 
+describe("parseProcStat", () => {
+  it("reads ppid, cpu ticks and start ticks past a name with spaces and parens", () => {
+    const stat =
+      "20735 (next-server (v16.3.8)) S 20718 20674 20674 0 -1 4194304 1 0 0 0 1200 300 0 0 20 0 11 0 3601234 1 2 3";
+    expect(parseProcStat(stat)).toEqual({
+      name: "next-server (v16.3.8)",
+      ppid: 20718,
+      cpuTicks: 1500,
+      startTicks: 3601234,
+    });
+    expect(parseProcStat("garbage")).toBeNull();
+    // Whole seconds, like the native monitor, so kill identities match.
+    expect(procStartTimeMs(1_793_570_000, 3601234)).toBe((1_793_570_000 + 36012) * 1000);
+  });
+});
+
 describe("attributeProcesses", () => {
   it("gives untagged descendants their nearest tagged ancestor's thread", () => {
     const processes = [
@@ -88,6 +107,8 @@ describe("attributeProcesses", () => {
       proc(3, 2, "server-child"), // bash, env cleared
       proc(4, 3, "server-child"), // pnpm, inherits through bash
       proc(5, 1, "server-child"), // shared helper, untagged
+      proc(6, 99, "server-child"), // detached dev server, re-parented to the user manager
+      proc(7, 6, "server-child"), // its worker
     ];
     const owners = attributeProcesses(
       processes,
@@ -96,12 +117,38 @@ describe("attributeProcesses", () => {
         [3, null],
         [4, null],
         [5, null],
+        [6, "t-1"],
+        [7, null],
       ]),
     );
     expect(owners.get(2)).toBe("t-1");
     expect(owners.get(4)).toBe("t-1");
     expect(owners.get(5)).toBeNull();
+    expect(owners.get(7)).toBe("t-1");
     expect(owners.has(1)).toBe(false);
+  });
+});
+
+describe("withScopeOwners", () => {
+  it("gives untagged scope members the scope's thread and leaves ambiguous scopes alone", () => {
+    const tags = withScopeOwners(
+      [
+        { pids: [10, 11, 12] }, // claude (tagged), chrome renderer and escaped browser (untagged)
+        { pids: [20, 21] }, // shared app-server: nobody tagged
+        { pids: [30, 31, 32] }, // two owners
+      ],
+      new Map([
+        [10, "t-1"],
+        [11, null],
+        [20, null],
+        [30, "t-2"],
+        [31, "t-3"],
+      ]),
+    );
+    expect(tags.get(11)).toBe("t-1");
+    expect(tags.get(12)).toBe("t-1");
+    expect(tags.get(21)).toBeUndefined();
+    expect(tags.get(32)).toBeUndefined();
   });
 });
 

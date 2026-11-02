@@ -376,6 +376,42 @@ export const make = Effect.gen(function* () {
     return killed._tag === "Some" && killed.value.code === 0;
   });
 
+  let ownedControlGroup: string | undefined;
+  const scopeProcesses: AgentScopeShape["scopeProcesses"] = Effect.gen(function* () {
+    if (ownedControlGroup === undefined) {
+      const scope = yield* systemd;
+      if (scope === undefined) return [];
+      const shown = yield* run(scope.systemctl, [
+        "--user",
+        "show",
+        ownedSlice,
+        "--property=ControlGroup",
+      ]);
+      const controlGroup =
+        shown._tag === "Some" ? (parseKeyValues(shown.value.stdout).get("ControlGroup") ?? "") : "";
+      if (controlGroup.length === 0) return [];
+      ownedControlGroup = controlGroup;
+    }
+    const sliceDir = path.join("/sys/fs/cgroup", ownedControlGroup);
+    const entries = yield* fileSystem
+      .readDirectory(sliceDir)
+      .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+    return yield* Effect.forEach(
+      entries.filter((entry) => entry.endsWith(".scope")),
+      (unit) =>
+        readCgroupFile(path.join(ownedControlGroup ?? "", unit), "cgroup.procs").pipe(
+          Effect.map((list) => ({
+            unit,
+            pids: list
+              .split("\n")
+              .map((line) => Number(line))
+              .filter((pid) => Number.isInteger(pid) && pid > 0),
+          })),
+        ),
+      { concurrency: 8 },
+    );
+  });
+
   const clear: AgentScopeShape["clear"] = Effect.fn("agentScope.clear")(function* (threadId) {
     if (!scopeByThread.has(threadId)) return;
     const scope = yield* systemd;
@@ -424,6 +460,7 @@ export const make = Effect.gen(function* () {
     stop,
     kill,
     clear,
+    scopeProcesses,
   } satisfies AgentScopeShape;
 });
 

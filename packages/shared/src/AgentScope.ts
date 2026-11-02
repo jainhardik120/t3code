@@ -34,6 +34,13 @@ export interface AgentScopeShape {
    * it, even when the next session runs without one (Cursor, OpenCode).
    */
   readonly clear: (threadId: string) => Effect.Effect<void>;
+  /**
+   * Processes in each of this server's agent scopes, including ones
+   * re-parented away from the server's process tree.
+   */
+  readonly scopeProcesses: Effect.Effect<
+    ReadonlyArray<{ readonly unit: string; readonly pids: ReadonlyArray<number> }>
+  >;
 }
 
 export interface AgentScopeCommand {
@@ -50,6 +57,7 @@ export const AgentScope = Context.Reference<AgentScopeShape>("@t3tools/shared/Ag
     stop: () => Effect.void,
     kill: () => Effect.succeed(false),
     clear: () => Effect.void,
+    scopeProcesses: Effect.succeed([]),
   }),
 });
 

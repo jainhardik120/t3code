@@ -1,11 +1,7 @@
 /**
- * Tolerant shell parser for presenting agent-written commands to humans.
- *
- * This is not a shell. It recognizes the shapes agents actually write (a `cd`
- * prefix, `;`/`&&` chains, pipes into `head`/`grep`, heredoc scripts, polling
- * loops, `echo "=== label ==="` section markers) and leaves everything else as
- * raw text. Callers must always offer the raw command alongside: anything this
- * parser misreads stays visible there.
+ * Tolerant shell parser for showing agent-written commands to humans. Not a shell:
+ * it recognizes the shapes agents write and leaves the rest as raw text, so callers
+ * must always offer the raw command alongside.
  */
 
 export interface ShellWord {
@@ -20,7 +16,7 @@ export interface ShellScript {
   readonly code: string;
 }
 
-export type ShellConnector = "and" | "or" | "background" | null;
+export type ShellConnector = "and" | "or" | null;
 
 export interface ShellPipelineStage {
   readonly words: ReadonlyArray<ShellWord>;
@@ -44,6 +40,8 @@ export interface ShellRunStep {
   readonly script?: ShellScript;
   /** Commands run somewhere else: `ssh host "…"`, `bash -c "…"`, `docker exec … sh -c`. */
   readonly nested?: { readonly label: string; readonly command: ParsedShellCommand };
+  /** Ended with `&`: the shell moves on without waiting. */
+  readonly background?: true;
   readonly raw: string;
 }
 
@@ -64,6 +62,7 @@ export interface ShellAssignStep {
   readonly kind: "assign";
   readonly connector: ShellConnector;
   readonly assignments: ReadonlyArray<{ readonly name: string; readonly value: string }>;
+  readonly background?: true;
   readonly raw: string;
 }
 
@@ -73,6 +72,7 @@ export interface ShellBlockStep {
   readonly label: string;
   readonly body: ReadonlyArray<ShellStep>;
   readonly elseBody?: ReadonlyArray<ShellStep>;
+  readonly background?: true;
   readonly raw: string;
 }
 
@@ -85,9 +85,6 @@ export interface ParsedShellCommand {
   readonly variables: ReadonlyArray<{ readonly name: string; readonly value: string }>;
   readonly steps: ReadonlyArray<ShellStep>;
 }
-
-// ---------------------------------------------------------------------------
-// Tokenizer
 
 type Token =
   | {
@@ -107,6 +104,48 @@ type Token =
 const OPERATORS = ["&&", "||", ";;", ";", "|&", "|", "&", "\n"] as const;
 const REDIRECT_PATTERN = /^(\d*|&)(>>?|<|>&|<&)(&?\d+|-)?$/;
 const REDIRECT_WITH_TARGET = /^(\d*|&)(>>?|<|>&|<&)(.+)$/;
+
+/** End of a `$(…)` or `${…}` starting at `start`, skipping nested quotes and substitutions. */
+function substitutionEnd(source: string, start: number): number {
+  const close = source[start + 1] === "{" ? "}" : ")";
+  const open = close === "}" ? "{" : "(";
+  let depth = 0;
+  let index = start + 1;
+  while (index < source.length) {
+    const c = source[index]!;
+    if (c === "\\") {
+      index += 2;
+      continue;
+    }
+    if (c === "'" && close === ")") {
+      const end = source.indexOf("'", index + 1);
+      index = end === -1 ? source.length : end + 1;
+      continue;
+    }
+    if (c === '"') {
+      index += 1;
+      while (index < source.length && source[index] !== '"') {
+        if (source[index] === "\\") index += 2;
+        else if (source[index] === "$" && "({".includes(source[index + 1] ?? "")) {
+          index = substitutionEnd(source, index);
+        } else index += 1;
+      }
+      index += 1;
+      continue;
+    }
+    if (c === "$" && "({".includes(source[index + 1] ?? "")) {
+      index = substitutionEnd(source, index);
+      continue;
+    }
+    if (c === open) depth += 1;
+    if (c === close) {
+      depth -= 1;
+      if (depth === 0) return index + 1;
+    }
+    index += 1;
+  }
+  return source.length;
+}
 
 function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
@@ -145,6 +184,20 @@ function tokenize(source: string): Token[] {
       index = newline === -1 ? source.length : newline;
       continue;
     }
+    // `(( i++ ))` is arithmetic, not two subshells.
+    if (source.startsWith("((", index)) {
+      const close = source.indexOf("))", index + 2);
+      const end = close === -1 ? source.length : close + 2;
+      const raw = source.slice(index, end);
+      tokens.push({ type: "word", word: { raw, value: raw }, start: index, end });
+      index = end;
+      continue;
+    }
+    if (char === "(" || char === ")") {
+      tokens.push({ type: "op", op: char, start: index, end: index + 1 });
+      index += 1;
+      continue;
+    }
     const op = OPERATORS.find((candidate) => source.startsWith(candidate, index));
     if (op) {
       tokens.push({ type: "op", op, start: index, end: index + op.length });
@@ -167,11 +220,18 @@ function tokenize(source: string): Token[] {
     }
     const start = index;
     let value = "";
-    let depth = 0;
     while (index < source.length) {
       const c = source[index]!;
-      if (depth === 0 && (c === " " || c === "\t" || c === "\r" || c === "\n")) break;
-      if (depth === 0 && (c === ";" || c === "|" || c === "&")) {
+      if (c === " " || c === "\t" || c === "\r" || c === "\n" || c === ")") break;
+      // `arr=(a b)` keeps its list inside the word.
+      if (c === "(" && value.endsWith("=")) {
+        const close = source.indexOf(")", index);
+        const end = close === -1 ? source.length : close + 1;
+        value += source.slice(index, end);
+        index = end;
+        continue;
+      }
+      if (c === ";" || c === "|" || c === "&") {
         // `2>&1` and `&>` keep their `&` inside the word.
         const prev = source[index - 1];
         if (!(c === "&" && (prev === ">" || prev === "<" || source[index + 1] === ">"))) break;
@@ -197,6 +257,12 @@ function tokenize(source: string): Token[] {
             index += 2;
             continue;
           }
+          if (source[index] === "$" && "({".includes(source[index + 1] ?? "")) {
+            const end = substitutionEnd(source, index);
+            value += source.slice(index, end);
+            index = end;
+            continue;
+          }
           value += source[index];
           index += 1;
         }
@@ -204,13 +270,17 @@ function tokenize(source: string): Token[] {
         continue;
       }
       if (c === "$" && (source[index + 1] === "(" || source[index + 1] === "{")) {
-        depth += 1;
-        value += source.slice(index, index + 2);
+        const end = substitutionEnd(source, index);
+        value += source.slice(index, end);
+        index = end;
+        continue;
+      }
+      // `name() { …; }` defines a function; keep `name()` as one word.
+      if (c === "(" && source[index + 1] === ")" && value.length > 0) {
+        value += "()";
         index += 2;
         continue;
       }
-      if (depth > 0 && (c === "(" || c === "{")) depth += 1;
-      if (depth > 0 && (c === ")" || c === "}")) depth -= 1;
       value += c;
       index += 1;
     }
@@ -229,13 +299,13 @@ function tokenize(source: string): Token[] {
   return tokens;
 }
 
-// ---------------------------------------------------------------------------
-// Statements
-
 interface RawStatement {
   readonly connector: ShellConnector;
   readonly stages: ShellPipelineStage[];
   readonly raw: string;
+  /** `(` and `)` of a subshell, carried as empty statements. */
+  readonly group?: "open" | "close";
+  background?: true;
 }
 
 function splitStatements(source: string, tokens: ReadonlyArray<Token>): RawStatement[] {
@@ -286,15 +356,25 @@ function splitStatements(source: string, tokens: ReadonlyArray<Token>): RawState
         flushStage();
         continue;
       }
-      flushStatement(
-        token.op === "&&"
-          ? "and"
-          : token.op === "||"
-            ? "or"
-            : token.op === "&"
-              ? "background"
-              : null,
-      );
+      if (token.op === "(" || token.op === ")") {
+        const pending = connector;
+        flushStatement(null);
+        statements.push({
+          connector: token.op === "(" ? pending : null,
+          stages: [],
+          raw: token.op,
+          group: token.op === "(" ? "open" : "close",
+        });
+        connector = null;
+        continue;
+      }
+      const count = statements.length;
+      flushStatement(token.op === "&&" ? "and" : token.op === "||" ? "or" : null);
+      // `&` backgrounds what came before it, including a just-closed subshell.
+      if (token.op === "&") {
+        const last = statements.at(-1);
+        if (last && (statements.length > count || last.group === "close")) last.background = true;
+      }
       continue;
     }
     if (token.type === "heredoc") {
@@ -338,9 +418,6 @@ function splitStatements(source: string, tokens: ReadonlyArray<Token>): RawState
   flushStatement(null);
   return statements;
 }
-
-// ---------------------------------------------------------------------------
-// Steps
 
 const ASSIGNMENT = /^([A-Za-z_][A-Za-z0-9_]*)=([\s\S]*)$/;
 const SECTION_DECORATION = /^\s*([=\-#*~]{2,}|>{2,})\s*(.*?)\s*\1?\s*$/;
@@ -838,7 +915,30 @@ function buildSteps(
     const statement = statements[cursor.index]!;
     const head = firstValue(statement);
     if (head !== undefined && stopAt.has(head)) return steps;
+    if (statement.group === "close") {
+      if (stopAt.has(")")) return steps;
+      cursor.index += 1;
+      continue;
+    }
     cursor.index += 1;
+
+    if (statement.group === "open") {
+      const body = buildSteps(statements, cursor, new Set([")"]));
+      const close = statements[cursor.index];
+      if (close?.group === "close") cursor.index += 1;
+      // `(cmd &)` is the usual way to detach: the subshell exits and the command is orphaned.
+      const last = body.at(-1);
+      const detached = last !== undefined && last.kind !== "section" && last.background === true;
+      steps.push({
+        kind: "block",
+        connector: statement.connector,
+        label: detached ? "Detached" : "Subshell",
+        body,
+        ...(close?.background ? { background: true as const } : {}),
+        raw: statement.raw,
+      });
+      continue;
+    }
 
     if (head !== undefined && BLOCK_OPENERS.has(head)) {
       steps.push(buildBlock(head, statement, statements, cursor));
@@ -888,13 +988,15 @@ function buildBlock(
     elseBody = buildSteps(statements, cursor, new Set(["fi"]));
   }
   const end = statements[cursor.index];
-  if (end && BLOCK_CLOSERS.has(firstValue(end) ?? "")) cursor.index += 1;
+  const closed = end !== undefined && BLOCK_CLOSERS.has(firstValue(end) ?? "");
+  if (closed) cursor.index += 1;
   return {
     kind: "block",
     connector: header.connector,
     label: quoteForLabel(label, 120),
     body,
     ...(elseBody ? { elseBody } : {}),
+    ...(closed && end.background ? { background: true as const } : {}),
     raw: header.raw,
   };
 }
@@ -916,6 +1018,28 @@ function buildStep(statement: RawStatement): ShellStep {
         const match = ASSIGNMENT.exec(word.value)!;
         return { name: match[1]!, value: match[2]! };
       }),
+      ...(statement.background ? { background: true as const } : {}),
+      raw: statement.raw,
+    };
+  }
+  const background = statement.background ? { background: true as const } : {};
+  // `: > file` empties the file.
+  const truncated =
+    main!.words.length === 1 && main!.words[0]!.value === ":" && rest.length === 0
+      ? main!.redirects.map((redirect) => /^>(.+)$/.exec(redirect)?.[1]).find(Boolean)
+      : undefined;
+  if (truncated !== undefined) {
+    return {
+      kind: "run",
+      connector: statement.connector,
+      program: ":",
+      words: [{ raw: statement.raw, value: statement.raw }],
+      env: [],
+      wrappers: [],
+      redirects: [],
+      filters: [],
+      summary: `Empty ${truncated}`,
+      ...background,
       raw: statement.raw,
     };
   }
@@ -933,6 +1057,7 @@ function buildStep(statement: RawStatement): ShellStep {
     redirects: [...main!.redirects, ...rest.flatMap((filter) => filter.redirects)],
     filters: rest.map(describeFilter),
     ...summarize(program, words, stage),
+    ...background,
     raw: statement.raw,
   };
 }
@@ -975,9 +1100,6 @@ export function parseShellCommand(source: string): ParsedShellCommand {
         : remaining,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Output sections
 
 export interface ShellOutputSection {
   /** Title of the matching section step, or null for output before any marker. */

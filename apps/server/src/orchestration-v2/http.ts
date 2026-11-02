@@ -204,6 +204,10 @@ export const layer = HttpApiBuilder.group(
         Effect.fn("environment.orchestration.activitySignalProcess")(function* (args) {
           yield* annotateEnvironmentRequest(args.endpoint.name);
           yield* requireEnvironmentScope(AuthEnvironmentMaintainScope);
+          if (Option.isSome(agentActivity)) {
+            const scoped = yield* agentActivity.value.signalScopedProcess(args.payload);
+            if (Option.isSome(scoped)) return scoped.value;
+          }
           if (Option.isNone(processDiagnostics)) {
             return yield* failEnvironmentInternal(
               "orchestration_snapshot_failed",

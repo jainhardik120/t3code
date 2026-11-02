@@ -9,7 +9,7 @@ function runSteps(steps: ReadonlyArray<ShellStep>) {
 describe("parseShellCommand", () => {
   it("lifts a leading cd into the working directory and labels pipe filters", () => {
     const parsed = parseShellCommand(
-      "cd /repo/apps/web; grep -rn \"command_execution\" src --include=*.ts 2>/dev/null | head -20",
+      'cd /repo/apps/web; grep -rn "command_execution" src --include=*.ts 2>/dev/null | head -20',
     );
     expect(parsed.cwd).toBe("/repo/apps/web");
     const [search] = runSteps(parsed.steps);
@@ -43,6 +43,20 @@ describe("parseShellCommand", () => {
     expect(ssh?.nested?.command.cwd).toBe("/srv");
   });
 
+  it("groups subshells, marks the backgrounded step, and names truncations", () => {
+    const parsed = parseShellCommand(
+      ": > /tmp/cdp/daemon.log; (nohup node /tmp/cdp/daemon.mjs > /tmp/cdp/daemon.log 2>&1 &); sleep 1 & wait",
+    );
+    const [truncate, detached, sleep, wait] = parsed.steps;
+    expect(truncate).toMatchObject({ kind: "run", summary: "Empty /tmp/cdp/daemon.log" });
+    expect(detached).toMatchObject({ kind: "block", label: "Detached" });
+    const [daemon] = runSteps(detached?.kind === "block" ? detached.body : []);
+    expect(daemon).toMatchObject({ program: "node", background: true, connector: null });
+    expect(sleep).toMatchObject({ program: "sleep", background: true });
+    expect(wait).toMatchObject({ program: "wait", connector: null });
+    expect(wait).not.toHaveProperty("background");
+  });
+
   it("nests loop bodies under a block", () => {
     const parsed = parseShellCommand("until curl -sf localhost:3000; do sleep 2; done");
     const [block] = parsed.steps;
@@ -55,7 +69,9 @@ describe("parseShellCommand", () => {
 
 describe("splitShellOutputSections", () => {
   it("splits output at echoed section markers", () => {
-    const parsed = parseShellCommand('echo "=== boot ==="; getprop boot; echo "=== api ==="; getprop sdk');
+    const parsed = parseShellCommand(
+      'echo "=== boot ==="; getprop boot; echo "=== api ==="; getprop sdk',
+    );
     const sections = splitShellOutputSections(parsed, "=== boot ===\n1\n=== api ===\n36\n");
     expect(sections.map((section) => [section.title, section.text.trim()])).toEqual([
       ["boot", "1"],

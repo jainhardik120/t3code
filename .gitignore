@@ -49,3 +49,6 @@ node_modules/
 
 # pnpm content-addressable store; never belongs in the repo.
 .pnpm-store/
+
+# Firebase service account key; never commit
+service-account.json

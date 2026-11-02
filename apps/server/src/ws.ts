@@ -2670,7 +2670,15 @@ export const layerWsRpc = (
         [WS_METHODS.serverRetryResourceTelemetry]: (_input) => resourceTelemetry.retry,
         [WS_METHODS.serverCheckOtlpEndpoint]: (input) => otlpEndpointCheck.check(input),
         [WS_METHODS.serverPrepareTriage]: (input) => triage.prepare(input),
-        [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
+        [WS_METHODS.serverSignalProcess]: (input) =>
+          agentActivity.signalScopedProcess(input).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => processDiagnostics.signal(input),
+                onSome: Effect.succeed,
+              }),
+            ),
+          ),
         [WS_METHODS.pushRegisterToken]: Effect.fn("ws.pushRegisterToken")(
           function* (input) {
             const now = yield* DateTime.now;

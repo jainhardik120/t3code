@@ -28,6 +28,7 @@ import { cn } from "../../lib/utils";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useTurnItemDetail } from "../../state/queries";
 import { useEnvironmentQuery } from "../../state/query";
+import { useCommandOutputStreaming } from "./CommandOutputPanel";
 import type { TurnItemSource } from "./timelineRowContext";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -95,6 +96,11 @@ function highlightCodeHtml(
   }
 }
 
+function lineCount(text: string): string {
+  const count = text.split("\n").length;
+  return `${count} ${count === 1 ? "line" : "lines"}`;
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -160,7 +166,19 @@ export function CommandDetailsDialog({
     return () => window.clearInterval(timer);
   }, [isBackground, refreshBackground]);
   const backgroundText = background.data?.text;
-  const rawOutput = backgroundText ?? item.output;
+  const running = item.status === "running" || item.status === "pending";
+  const streaming = useCommandOutputStreaming(environmentId) || source?.commandOutput !== undefined;
+  // Unpersisted tail of a foreground command, streamed until it settles.
+  const liveInput = { threadId: projectedItem.sourceThreadId, itemId: projectedItem.sourceItemId };
+  const live = useEnvironmentQuery(
+    running && streaming
+      ? source?.commandOutput
+        ? source.commandOutput(liveInput)
+        : orchestrationEnvironment.v2.commandOutput({ environmentId, input: liveInput })
+      : null,
+  );
+  const liveText = running ? live.data?.output.text || undefined : undefined;
+  const rawOutput = backgroundText ?? liveText ?? item.output;
   const streams = rawOutput === undefined ? null : outputStreams(rawOutput);
   const output =
     streams === null
@@ -168,7 +186,6 @@ export function CommandDetailsDialog({
       : [streams.stdout, streams.stderr].filter((text) => text.length > 0).join("\n");
   const sections = streams === null ? [] : outputSections(parsed, streams);
   const exitCode = item.exitCode;
-  const running = item.status === "running" || item.status === "pending";
   const failed =
     item.status === "failed" ||
     item.outputIndicatesFailure === true ||
@@ -180,14 +197,15 @@ export function CommandDetailsDialog({
   const title = item.title ?? firstSummary?.summary ?? "Command";
 
   const outputRef = useRef<HTMLDivElement>(null);
-  // Follow a growing background log like a terminal, unless the reader scrolled up.
+  // Follow growing output like a terminal, unless the reader scrolled up.
   const followTailRef = useRef(true);
+  const growingText = backgroundText ?? liveText;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps the scroll container pinned to new output
   useEffect(() => {
     const element = outputRef.current;
-    if (!isBackground || backgroundText === undefined || element === null) return;
+    if (growingText === undefined || element === null) return;
     if (followTailRef.current) element.scrollTop = element.scrollHeight;
-  }, [isBackground, backgroundText]);
+  }, [growingText]);
   const scrollToSection = (marker: string) => {
     const target = outputRef.current?.querySelector(`[data-marker="${CSS.escape(marker)}"]`);
     target?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -269,7 +287,9 @@ export function CommandDetailsDialog({
                   <span className="text-xs text-muted-foreground">
                     {background.data
                       ? `live file · ${formatFileSize(background.data.sizeBytes)}${background.data.truncated ? " · showing the end" : ""}`
-                      : `${output.split("\n").length} lines`}
+                      : liveText !== undefined
+                        ? `live · ${lineCount(output)}${live.data?.output.truncated ? " · showing the end" : ""}`
+                        : lineCount(output)}
                   </span>
                 ) : null
               }
@@ -287,6 +307,7 @@ export function CommandDetailsDialog({
                 sections={sections}
                 pending={fetches && item === wireItem && detail.isPending}
                 running={running}
+                streaming={streaming}
                 error={fetches && item === wireItem ? detail.error : null}
                 empty={output === null || output.trim().length === 0}
               />
@@ -330,6 +351,7 @@ function OutputView(props: {
   readonly sections: ReturnType<typeof splitShellOutputSections>;
   readonly pending: boolean;
   readonly running: boolean;
+  readonly streaming: boolean;
   readonly error: string | null;
   readonly empty: boolean;
 }) {
@@ -343,7 +365,11 @@ function OutputView(props: {
       );
     return (
       <p className="text-sm text-muted-foreground">
-        {props.running ? "Output appears when the command finishes." : "No output."}
+        {props.running
+          ? props.streaming
+            ? "Waiting for output…"
+            : "Output appears when the command finishes."
+          : "No output."}
       </p>
     );
   }
@@ -396,7 +422,6 @@ function SectionHeading(props: { readonly title: string | null; readonly onClick
 const CONNECTOR_LABELS: Record<Exclude<ShellConnector, null>, string> = {
   and: "if ok",
   or: "else",
-  background: "in background",
 };
 
 function ParsedCommandView(props: {
@@ -490,6 +515,16 @@ function StepView(props: {
           <div className="flex items-baseline text-sm">
             <ConnectorLabel connector={step.connector} />
             <span className="font-medium text-foreground/90">{step.label}</span>
+            {step.label === "Detached" ? (
+              <span className="ms-2 text-xs text-muted-foreground">
+                keeps running after the command returns
+              </span>
+            ) : null}
+            {step.background ? (
+              <Badge variant="outline" size="sm" className="ms-2">
+                in background
+              </Badge>
+            ) : null}
           </div>
           <div className="ms-1.5 border-s border-border/70 ps-3">
             <StepList steps={step.body} onSectionClick={props.onSectionClick} />
@@ -515,7 +550,12 @@ function RunStepView(props: {
 }) {
   const { step } = props;
   const mainCommand = step.words.map((word) => word.raw).join(" ");
-  const badges = [...step.wrappers, ...step.env, ...describeShellRedirects(step.redirects)];
+  const badges = [
+    ...(step.background ? ["in background"] : []),
+    ...step.wrappers,
+    ...step.env,
+    ...describeShellRedirects(step.redirects),
+  ];
   return (
     <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
       <div className="flex min-w-0 items-baseline">
