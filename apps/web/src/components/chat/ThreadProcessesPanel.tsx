@@ -1,7 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type {
   AgentActivityProcess,
   EnvironmentId,
+  OrchestrationV2ProjectedTurnItem,
   ServerProcessSignal,
   ThreadId,
 } from "@t3tools/contracts";
@@ -21,8 +23,10 @@ import {
 import { useState } from "react";
 
 import { cn } from "../../lib/utils";
+import { useQuietThreadVisibleTurnItems } from "../../state/entities";
 import {
   agentProcessLabel,
+  agentShellCommand,
   type AgentProcessNode,
   buildAgentProcessTree,
   formatActivityBytes,
@@ -35,6 +39,7 @@ import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { CommandDetailsDialog } from "./CommandDetailsDialog";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
 import { THREAD_DETAILS_PANEL_ICON_CLASS } from "./threadDetailsPanelStyles";
@@ -47,8 +52,13 @@ const DEFAULT_EXPANDED_DEPTH = 1;
 export function ThreadProcessesPanel(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
+  readonly workspaceRoot?: string | undefined;
 }) {
   const activity = useThreadAgentActivity(props.environmentId, props.threadId);
+  const turnItems = useQuietThreadVisibleTurnItems(
+    scopeThreadRef(props.environmentId, props.threadId),
+  );
+  const [openCommand, setOpenCommand] = useState<OrchestrationV2ProjectedTurnItem | null>(null);
   const { canForceStop, stoppingThreadId, forceStopThread } = useForceStopThread(
     props.environmentId,
   );
@@ -64,7 +74,28 @@ export function ThreadProcessesPanel(props: {
     () => new Map(),
   );
 
-  if (activity === null || activity.processes.length === 0) return null;
+  const dialog =
+    openCommand === null ? null : (
+      <CommandDetailsDialog
+        projectedItem={openCommand}
+        environmentId={props.environmentId}
+        workspaceRoot={props.workspaceRoot}
+        onClose={() => setOpenCommand(null)}
+      />
+    );
+  if (activity === null || activity.processes.length === 0) return dialog;
+
+  // Command items are never streamed, so the quiet projection carries them whole.
+  const commandByInput = new Map<string, OrchestrationV2ProjectedTurnItem>();
+  for (const entry of turnItems) {
+    if (entry.item.type === "command_execution") {
+      commandByInput.set(entry.item.input.trim(), entry as OrchestrationV2ProjectedTurnItem);
+    }
+  }
+  const commandFor = (process: AgentActivityProcess) => {
+    const command = agentShellCommand(process);
+    return command === null ? undefined : commandByInput.get(command.trim());
+  };
 
   const signal = async (process: AgentActivityProcess, signalName: ServerProcessSignal) => {
     if (signalingKey !== null) return;
@@ -108,142 +139,173 @@ export function ThreadProcessesPanel(props: {
   const status = activity.runStatus !== null ? "running" : (release ?? "idle");
 
   return (
-    <ThreadDetailsSection
-      headingId="thread-details-processes-heading"
-      title={`Agent processes · ${formatActivityBytes(activity.usage.residentBytes)} · ${formatActivityCpu(activity.usage.cpuPercent)}`}
-      actions={
-        canForceStop ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <ThreadDetailsControl
-                  size="icon-xs"
-                  variant="ghost"
-                  part="icon"
-                  tone="destructive"
-                  aria-label="Stop the agent and its processes"
-                  disabled={stoppingThreadId !== null}
-                  onClick={() => void forceStopThread(props.threadId)}
-                />
-              }
-            >
-              {stoppingThreadId === props.threadId ? (
-                <LoaderCircleIcon aria-hidden className="size-3 animate-spin" />
-              ) : (
-                <PowerIcon aria-hidden className="size-3" />
-              )}
-            </TooltipTrigger>
-            <TooltipPopup side="left">
-              Stop the agent and every process it started. The thread resumes on your next message.
-            </TooltipPopup>
-          </Tooltip>
-        ) : null
-      }
-    >
-      <p className="mb-1 px-2.5 text-2xs text-muted-foreground">
-        {activity.usage.processCount} {activity.usage.processCount === 1 ? "process" : "processes"}{" "}
-        · {status}
-      </p>
-      <ul data-thread-processes-list className="m-0 max-h-72 list-none overflow-y-auto p-0">
-        {visibleRows.map(({ node, treeDepth, expanded }) => {
-          const { process } = node;
-          const key = processKey(process);
-          const busy = signalingKey === key;
-          const guard = isAgentGuardProcess(process);
-          const signalable = canSignal && !guard;
-          const hasChildren = node.children.length > 0;
-          const showTotal = hasChildren && !expanded;
-          return (
-            <li key={key} className="group relative flex items-center rounded-lg">
-              <ThreadDetailsControl
-                size="sm"
-                variant="ghost"
-                part="row"
-                multiline
-                {...(hasChildren
-                  ? {
-                      "aria-expanded": expanded,
-                      onClick: () => toggle(key, expanded),
-                    }
-                  : {})}
+    <>
+      {dialog}
+      <ThreadDetailsSection
+        headingId="thread-details-processes-heading"
+        title={`Agent processes · ${formatActivityBytes(activity.usage.residentBytes)} · ${formatActivityCpu(activity.usage.cpuPercent)}`}
+        actions={
+          canForceStop ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <ThreadDetailsControl
+                    size="icon-xs"
+                    variant="ghost"
+                    part="icon"
+                    tone="destructive"
+                    aria-label="Stop the agent and its processes"
+                    disabled={stoppingThreadId !== null}
+                    onClick={() => void forceStopThread(props.threadId)}
+                  />
+                }
               >
-                <span
-                  className="flex shrink-0 items-center"
-                  style={{ paddingInlineStart: `${Math.min(treeDepth, 6) * 0.75}rem` }}
-                >
-                  {hasChildren ? (
-                    <ChevronRightIcon
-                      aria-hidden
-                      className={cn(THREAD_DETAILS_PANEL_ICON_CLASS, expanded && "rotate-90")}
-                    />
-                  ) : (
-                    <CpuIcon aria-hidden className={THREAD_DETAILS_PANEL_ICON_CLASS} />
-                  )}
-                </span>
-                <span className={cn("flex min-w-0 flex-1 flex-col gap-0.5", signalable && "pe-12")}>
-                  <span
-                    className={cn(
-                      "truncate text-xs leading-4",
-                      guard ? "text-muted-foreground" : "font-mono text-foreground/85",
-                    )}
+                {stoppingThreadId === props.threadId ? (
+                  <LoaderCircleIcon aria-hidden className="size-3 animate-spin" />
+                ) : (
+                  <PowerIcon aria-hidden className="size-3" />
+                )}
+              </TooltipTrigger>
+              <TooltipPopup side="left">
+                Stop the agent and every process it started. The thread resumes on your next
+                message.
+              </TooltipPopup>
+            </Tooltip>
+          ) : null
+        }
+      >
+        <p className="mb-1 px-2.5 text-2xs text-muted-foreground">
+          {activity.usage.processCount}{" "}
+          {activity.usage.processCount === 1 ? "process" : "processes"} · {status}
+        </p>
+        <ul data-thread-processes-list className="m-0 max-h-72 list-none overflow-y-auto p-0">
+          {visibleRows.map(({ node, treeDepth, expanded }) => {
+            const { process } = node;
+            const key = processKey(process);
+            const busy = signalingKey === key;
+            const guard = isAgentGuardProcess(process);
+            const signalable = canSignal && !guard;
+            const hasChildren = node.children.length > 0;
+            const showTotal = hasChildren && !expanded;
+            const command = commandFor(process);
+            const chevron = (
+              <ChevronRightIcon
+                aria-hidden
+                className={cn(THREAD_DETAILS_PANEL_ICON_CLASS, expanded && "rotate-90")}
+              />
+            );
+            return (
+              <li
+                key={key}
+                className="group relative flex items-center rounded-lg"
+                style={{ paddingInlineStart: `${Math.min(treeDepth, 6) * 0.75}rem` }}
+              >
+                {command && hasChildren ? (
+                  // The row opens the command, so expanding children gets its own control.
+                  <ThreadDetailsControl
+                    size="icon-xs"
+                    variant="ghost"
+                    part="icon"
+                    aria-label={expanded ? "Hide child processes" : "Show child processes"}
+                    aria-expanded={expanded}
+                    onClick={() => toggle(key, expanded)}
                   >
-                    {agentProcessLabel(process)}
-                  </span>
-                  <span className="truncate text-2xs font-normal leading-4 text-muted-foreground">
-                    {showTotal
-                      ? `${formatActivityCpu(node.total.cpuPercent)} · ${formatActivityBytes(node.total.residentBytes)} · ${node.total.count} processes`
-                      : `${formatActivityCpu(process.cpuPercent)} · ${formatActivityBytes(process.residentBytes)} · pid ${process.pid}`}
-                    {guard ? " · stops the agent if T3 exits" : ""}
-                  </span>
-                </span>
-              </ThreadDetailsControl>
-              {signalable ? (
-                <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 gap-0.5 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100">
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <ThreadDetailsControl
-                          size="icon-xs"
-                          variant="ghost"
-                          part="icon"
-                          aria-label={`Interrupt pid ${process.pid}`}
-                          disabled={signalingKey !== null}
-                          onClick={() => void signal(process, "SIGINT")}
-                        />
+                    {chevron}
+                  </ThreadDetailsControl>
+                ) : null}
+                <ThreadDetailsControl
+                  size="sm"
+                  variant="ghost"
+                  part="row"
+                  multiline
+                  {...(command
+                    ? {
+                        "aria-haspopup": "dialog" as const,
+                        onClick: () => setOpenCommand(command),
                       }
-                    >
-                      {busy ? (
-                        <LoaderCircleIcon aria-hidden className="size-3 animate-spin" />
+                    : hasChildren
+                      ? {
+                          "aria-expanded": expanded,
+                          onClick: () => toggle(key, expanded),
+                        }
+                      : {})}
+                >
+                  {command && hasChildren ? null : (
+                    <span className="flex shrink-0 items-center">
+                      {hasChildren ? (
+                        chevron
                       ) : (
-                        <SquareIcon aria-hidden className="size-3 fill-current" />
+                        <CpuIcon aria-hidden className={THREAD_DETAILS_PANEL_ICON_CLASS} />
                       )}
-                    </TooltipTrigger>
-                    <TooltipPopup side="left">Interrupt (SIGINT)</TooltipPopup>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <ThreadDetailsControl
-                          size="icon-xs"
-                          variant="ghost"
-                          part="icon"
-                          tone="destructive"
-                          aria-label={`Kill pid ${process.pid}`}
-                          disabled={signalingKey !== null}
-                          onClick={() => void signal(process, "SIGKILL")}
-                        />
-                      }
+                    </span>
+                  )}
+                  <span
+                    className={cn("flex min-w-0 flex-1 flex-col gap-0.5", signalable && "pe-12")}
+                  >
+                    <span
+                      className={cn(
+                        "truncate text-xs leading-4",
+                        guard ? "text-muted-foreground" : "font-mono text-foreground/85",
+                      )}
                     >
-                      <XIcon aria-hidden className="size-3" />
-                    </TooltipTrigger>
-                    <TooltipPopup side="left">Kill (SIGKILL)</TooltipPopup>
-                  </Tooltip>
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </ThreadDetailsSection>
+                      {agentProcessLabel(process)}
+                    </span>
+                    <span className="truncate text-2xs font-normal leading-4 text-muted-foreground">
+                      {showTotal
+                        ? `${formatActivityCpu(node.total.cpuPercent)} · ${formatActivityBytes(node.total.residentBytes)} · ${node.total.count} processes`
+                        : `${formatActivityCpu(process.cpuPercent)} · ${formatActivityBytes(process.residentBytes)} · pid ${process.pid}`}
+                      {guard ? " · stops the agent if T3 exits" : ""}
+                    </span>
+                  </span>
+                </ThreadDetailsControl>
+                {signalable ? (
+                  <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 gap-0.5 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100">
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <ThreadDetailsControl
+                            size="icon-xs"
+                            variant="ghost"
+                            part="icon"
+                            aria-label={`Interrupt pid ${process.pid}`}
+                            disabled={signalingKey !== null}
+                            onClick={() => void signal(process, "SIGINT")}
+                          />
+                        }
+                      >
+                        {busy ? (
+                          <LoaderCircleIcon aria-hidden className="size-3 animate-spin" />
+                        ) : (
+                          <SquareIcon aria-hidden className="size-3 fill-current" />
+                        )}
+                      </TooltipTrigger>
+                      <TooltipPopup side="left">Interrupt (SIGINT)</TooltipPopup>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <ThreadDetailsControl
+                            size="icon-xs"
+                            variant="ghost"
+                            part="icon"
+                            tone="destructive"
+                            aria-label={`Kill pid ${process.pid}`}
+                            disabled={signalingKey !== null}
+                            onClick={() => void signal(process, "SIGKILL")}
+                          />
+                        }
+                      >
+                        <XIcon aria-hidden className="size-3" />
+                      </TooltipTrigger>
+                      <TooltipPopup side="left">Kill (SIGKILL)</TooltipPopup>
+                    </Tooltip>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      </ThreadDetailsSection>
+    </>
   );
 }

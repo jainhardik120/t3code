@@ -16,7 +16,7 @@ import {
   type ShellStep,
 } from "@t3tools/shared/shellCommand";
 import * as DateTime from "effect/DateTime";
-import { CheckIcon, ChevronRightIcon, CopyIcon, FolderIcon } from "lucide-react";
+import { CheckIcon, ChevronRightIcon, CopyIcon, CpuIcon, FolderIcon } from "lucide-react";
 import { Suspense, use, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
@@ -25,6 +25,13 @@ import { useRenderedAppearance } from "../../hooks/useTheme";
 import { resolveDiffThemeName } from "../../lib/diffRendering";
 import { getSyntaxHighlighterPromise } from "../../lib/syntaxHighlighting";
 import { cn } from "../../lib/utils";
+import {
+  buildAgentProcessTree,
+  findCommandProcessNode,
+  formatActivityBytes,
+  formatActivityCpu,
+  useThreadAgentActivity,
+} from "../../state/agentActivity";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useTurnItemDetail } from "../../state/queries";
 import { useEnvironmentQuery } from "../../state/query";
@@ -186,6 +193,12 @@ export function CommandDetailsDialog({
       : [streams.stdout, streams.stderr].filter((text) => text.length > 0).join("\n");
   const sections = streams === null ? [] : outputSections(parsed, streams);
   const exitCode = item.exitCode;
+  // Background commands keep running after their tool call returns, so look regardless of status.
+  const activity = useThreadAgentActivity(environmentId, projectedItem.sourceThreadId);
+  const processNode =
+    activity === null
+      ? null
+      : findCommandProcessNode(buildAgentProcessTree(activity.processes), item.input);
   const failed =
     item.status === "failed" ||
     item.outputIndicatesFailure === true ||
@@ -237,6 +250,13 @@ export function CommandDetailsDialog({
               </Badge>
             )}
             {duration && !isBackground ? <Badge variant="outline">{duration}</Badge> : null}
+            {processNode ? (
+              <Badge variant="outline">
+                <CpuIcon /> {formatActivityCpu(processNode.total.cpuPercent)} ·{" "}
+                {formatActivityBytes(processNode.total.residentBytes)}
+                {processNode.total.count > 1 ? ` · ${processNode.total.count} processes` : ""}
+              </Badge>
+            ) : null}
             {parsed.cwd ? (
               <Badge variant="outline" title={parsed.cwd}>
                 <FolderIcon /> {displayPath(parsed.cwd, workspaceRoot)}

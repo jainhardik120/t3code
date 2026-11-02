@@ -118,12 +118,24 @@ export function isAgentGuardProcess(process: AgentActivityProcess): boolean {
   return process.command.includes("kill -TERM 0") && process.command.includes("trap ''");
 }
 
+/**
+ * The command an agent shell runs: Claude wraps it as `eval '…'` after a snapshot
+ * loader, other agents pass it to `sh -c`/`bash -lc`. Null for any other process.
+ */
+export function agentShellCommand(process: AgentActivityProcess): string | null {
+  const command = process.command;
+  const evaled = /\beval '((?:[^']|'\\'')*)'/.exec(command);
+  if (evaled) return evaled[1]!.replaceAll("'\\''", "'");
+  const direct = /^(?:\S*\/)?(?:ba|z)?sh -l?c (.+)$/s.exec(command);
+  return direct ? direct[1]! : null;
+}
+
 /** Agent shells wrap each command in a snapshot loader; show the command itself. */
 export function agentProcessLabel(process: AgentActivityProcess): string {
   if (isAgentGuardProcess(process)) return "T3 process guard";
   const command = process.command || process.name;
-  const evaled = /\beval '((?:[^']|'\\'')*)'/.exec(command);
-  if (evaled) return `$ ${evaled[1]!.replaceAll("'\\''", "'")}`;
+  const shell = /\beval '/.test(command) ? agentShellCommand(process) : null;
+  if (shell !== null) return `$ ${shell}`;
   if (/^(\S*\/)?claude(\s|$)/.test(command)) {
     const model = /--model\s+(\S+)/.exec(command)?.[1];
     return model ? `claude · ${model.replace(/^claude-/, "")}` : "claude";
@@ -178,4 +190,18 @@ export function buildAgentProcessTree(
   return processes
     .filter((process) => !pids.has(process.ppid) || process.ppid === process.pid)
     .map((process) => build(process, new Set()));
+}
+
+/** The process subtree running `command`, with its combined usage; null once it exits. */
+export function findCommandProcessNode(
+  roots: ReadonlyArray<AgentProcessNode>,
+  command: string,
+): AgentProcessNode | null {
+  const wanted = command.trim();
+  for (const node of roots) {
+    if (agentShellCommand(node.process)?.trim() === wanted) return node;
+    const nested = findCommandProcessNode(node.children, command);
+    if (nested !== null) return nested;
+  }
+  return null;
 }

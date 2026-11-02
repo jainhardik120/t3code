@@ -247,6 +247,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                 <ThreadProcessesPanel
                   environmentId={props.environmentId}
                   threadId={props.threadId}
+                  workspaceRoot={props.gitCwd ?? undefined}
                 />
               ) : null}
 
