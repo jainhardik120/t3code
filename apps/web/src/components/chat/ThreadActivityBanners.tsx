@@ -160,8 +160,9 @@ export function backgroundWorkNowItem(input: {
   readonly stopping: boolean;
   readonly onStop: () => Promise<void>;
   readonly onOpenThread: (threadId: ThreadId) => void;
+  readonly onOpenCommand: (item: ThreadStructure["turnItems"][number]) => void;
 }): ThreadNowItem | null {
-  const { onOpenThread } = input;
+  const { onOpenThread, onOpenCommand } = input;
   const presentation = presentPendingBackgroundWork(input.tasks);
   if (presentation === null) return null;
   const rows = presentation.items.map((task) => {
@@ -176,6 +177,18 @@ export function backgroundWorkNowItem(input: {
       startedAtMs: item?.startedAt ? DateTime.toEpochMillis(item.startedAt) : null,
       updatedAtMs: subagent ? DateTime.toEpochMillis(subagent.updatedAt) : 0,
       childThreadId: task.childThreadId ?? subagent?.childThreadId ?? undefined,
+      command:
+        item?.type === "command_execution"
+          ? item
+          : task.kind === "command"
+            ? // Claude background tasks carry the Bash description, which is the command item's title.
+              input.turnItems.findLast(
+                (
+                  candidate,
+                ): candidate is Extract<typeof candidate, { type: "command_execution" }> =>
+                  candidate.type === "command_execution" && candidate.title === task.label,
+              )
+            : undefined,
     };
   });
   const [only] = rows.length === 1 ? rows : [];
@@ -185,6 +198,7 @@ export function backgroundWorkNowItem(input: {
   const isCommand = (row: (typeof rows)[number]) => row.task.kind !== "subagent";
   const verb = presentation.waiting ? "Waiting on" : "Running";
   const onlyThreadId = only?.childThreadId;
+  const onlyCommand = only?.command;
   const startedAtMs = only?.startedAtMs ?? null;
   return {
     id: `background-work:${input.threadId}`,
@@ -226,6 +240,11 @@ export function backgroundWorkNowItem(input: {
         {onlyThreadId === undefined ? null : (
           <InlineButton tone="muted" onClick={() => onOpenThread(onlyThreadId)}>
             Open
+          </InlineButton>
+        )}
+        {onlyCommand === undefined ? null : (
+          <InlineButton tone="muted" onClick={() => onOpenCommand(onlyCommand)}>
+            Output
           </InlineButton>
         )}
         <InlineButton disabled={input.stopDisabled} onClick={() => void input.onStop()}>

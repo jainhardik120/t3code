@@ -2401,6 +2401,7 @@ export default function ChatView(props: ChatViewProps) {
     setBranchMismatchDismissTick,
     showBranchMismatchBanner,
     threadStatusLine,
+    backgroundCommandDialog,
     shortcuts: threadLifecycleShortcuts,
   } = useThreadLifecycle({
     environmentId,
@@ -3125,6 +3126,7 @@ export default function ChatView(props: ChatViewProps) {
           goal={goalNow}
         />
         {threadStatusLine}
+        {backgroundCommandDialog}
         {pendingGuestMessageCount > 0 && isServerThread && activeThread ? (
           <GuestPendingMessages
             threadRef={scopeThreadRef(activeThread.environmentId, activeThread.id)}

@@ -65,6 +65,8 @@ import {
   runStopNowItem,
 } from "./ThreadActivityBanners";
 import { useForceStopThread } from "./useForceStopThread";
+import { CommandDetailsDialog } from "./CommandDetailsDialog";
+import type { OrchestrationV2ProjectedTurnItem } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import type { RunStopPresentation } from "@t3tools/client-runtime/state/thread-execution";
 import { Atom } from "effect/reactivity";
@@ -556,6 +558,18 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
           onForceStop: () => void forceStop.forceStopThread(activeThread.id, runStop.runId),
         })
       : null;
+  // Lives here, not in the banner, so it stays open when the background work finishes.
+  const [openBackgroundCommand, setOpenBackgroundCommand] =
+    useState<OrchestrationV2ProjectedTurnItem | null>(null);
+  const backgroundCommandDialog =
+    openBackgroundCommand === null ? null : (
+      <CommandDetailsDialog
+        projectedItem={openBackgroundCommand}
+        environmentId={environmentId}
+        workspaceRoot={activeProjectCwd ?? undefined}
+        onClose={() => setOpenBackgroundCommand(null)}
+      />
+    );
   const backgroundWorkNow = activeThread
     ? backgroundWorkNowItem({
         threadId: activeThread.id,
@@ -565,6 +579,14 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         stopping: isStoppingBackgroundWork,
         onStop: handleStopBackgroundWorkStable,
         onOpenThread: onOpenRelatedThreadStable,
+        onOpenCommand: (item) =>
+          setOpenBackgroundCommand({
+            position: 0,
+            visibility: "local",
+            sourceThreadId: activeThread.id,
+            sourceItemId: item.id,
+            item: item as OrchestrationV2ProjectedTurnItem["item"],
+          }),
       })
     : null;
   // The relative times read the clock; nowMinute re-renders them on the minute.
@@ -660,5 +682,6 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     setBranchMismatchDismissTick,
     showBranchMismatchBanner,
     threadStatusLine,
+    backgroundCommandDialog,
   };
 }
