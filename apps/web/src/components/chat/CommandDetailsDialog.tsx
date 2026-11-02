@@ -1,4 +1,5 @@
 import type {
+  AgentActivityProcess,
   EnvironmentId,
   OrchestrationV2ProjectedTurnItem,
   OrchestrationV2TurnItem,
@@ -15,17 +16,20 @@ import {
   type ShellConnector,
   type ShellStep,
 } from "@t3tools/shared/shellCommand";
+import { formatDuration as formatElapsedMs } from "@t3tools/shared/orchestrationTiming";
 import * as DateTime from "effect/DateTime";
 import { CheckIcon, ChevronRightIcon, CopyIcon, CpuIcon, FolderIcon } from "lucide-react";
-import { Suspense, use, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, Suspense, use, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useRenderedAppearance } from "../../hooks/useTheme";
 import { resolveDiffThemeName } from "../../lib/diffRendering";
 import { getSyntaxHighlighterPromise } from "../../lib/syntaxHighlighting";
+import { tickTextContent } from "../../lib/tickTextContent";
 import { cn } from "../../lib/utils";
 import {
+  type AgentProcessNode,
   buildAgentProcessTree,
   findCommandProcessNode,
   formatActivityBytes,
@@ -36,6 +40,7 @@ import { orchestrationEnvironment } from "../../state/orchestration";
 import { useTurnItemDetail } from "../../state/queries";
 import { useEnvironmentQuery } from "../../state/query";
 import { useCommandOutputStreaming } from "./CommandOutputPanel";
+import { matchProcessesToSteps } from "./commandStepTiming";
 import type { TurnItemSource } from "./timelineRowContext";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -125,6 +130,46 @@ function formatDuration(
   return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
 }
 
+function flattenProcessNodes(nodes: ReadonlyArray<AgentProcessNode>): AgentActivityProcess[] {
+  return nodes.flatMap((node) => [node.process, ...flattenProcessNodes(node.children)]);
+}
+
+interface StepTiming {
+  /** Start of the step's live process, or null once none is running. */
+  readonly runningSinceMs: number | null;
+  /** Observed run time of its finished processes; samples arrive every few seconds. */
+  readonly finishedMs: number;
+  readonly runs: number;
+}
+
+interface ObservedProcess {
+  readonly path: string;
+  readonly startMs: number;
+  readonly lastSeenMs: number;
+}
+
+const StepTimingCtx = createContext<ReadonlyMap<string, StepTiming>>(new Map());
+
+function stepTimings(
+  observed: ReadonlyMap<string, ObservedProcess>,
+  liveKeys: ReadonlySet<string>,
+): Map<string, StepTiming> {
+  const timings = new Map<string, StepTiming>();
+  for (const [key, process] of observed) {
+    const current = timings.get(process.path) ?? { runningSinceMs: null, finishedMs: 0, runs: 0 };
+    const live = liveKeys.has(key);
+    timings.set(process.path, {
+      runningSinceMs: live
+        ? Math.min(current.runningSinceMs ?? process.startMs, process.startMs)
+        : current.runningSinceMs,
+      finishedMs:
+        current.finishedMs + (live ? 0 : Math.max(0, process.lastSeenMs - process.startMs)),
+      runs: current.runs + 1,
+    });
+  }
+  return timings;
+}
+
 function displayPath(path: string, workspaceRoot: string | undefined) {
   if (path.startsWith("~") || path.startsWith("$")) return path;
   return formatWorkspaceRelativePath(path, workspaceRoot) || path;
@@ -199,6 +244,31 @@ export function CommandDetailsDialog({
     activity === null
       ? null
       : findCommandProcessNode(buildAgentProcessTree(activity.processes), item.input);
+  const stepProcesses = processNode
+    ? matchProcessesToSteps(parsed.steps, flattenProcessNodes(processNode.children))
+    : new Map<AgentActivityProcess, string>();
+  // Steps leave no record of their own; remember each process seen while the dialog is open.
+  const [observed, setObserved] = useState<{
+    readonly readAtMs: number | null;
+    readonly processes: ReadonlyMap<string, ObservedProcess>;
+  }>({ readAtMs: null, processes: new Map() });
+  if (activity !== null && activity.readAtMs !== observed.readAtMs) {
+    const processes = new Map(observed.processes);
+    for (const [process, path] of stepProcesses) {
+      const key = `${process.pid}:${process.startTimeMs}`;
+      processes.set(key, {
+        path,
+        startMs: observed.processes.get(key)?.startMs ?? activity.readAtMs - process.runTimeMs,
+        lastSeenMs: activity.readAtMs,
+      });
+    }
+    setObserved({ readAtMs: activity.readAtMs, processes });
+  }
+  const timings = stepTimings(
+    observed.processes,
+    new Set([...stepProcesses.keys()].map((process) => `${process.pid}:${process.startTimeMs}`)),
+  );
+  const startedAtMs = item.startedAt ? DateTime.toEpochMillis(item.startedAt) : null;
   const failed =
     item.status === "failed" ||
     item.outputIndicatesFailure === true ||
@@ -250,6 +320,17 @@ export function CommandDetailsDialog({
               </Badge>
             )}
             {duration && !isBackground ? <Badge variant="outline">{duration}</Badge> : null}
+            {running && startedAtMs !== null ? (
+              <Badge variant="outline">
+                <span
+                  ref={tickTextContent(
+                    (nowMs) => formatElapsedMs(Math.max(0, nowMs - startedAtMs)),
+                    true,
+                  )}
+                  className="tabular-nums"
+                />
+              </Badge>
+            ) : null}
             {processNode ? (
               <Badge variant="outline">
                 <CpuIcon /> {formatActivityCpu(processNode.total.cpuPercent)} ·{" "}
@@ -289,12 +370,14 @@ export function CommandDetailsDialog({
               {view === "raw" ? (
                 <CodeBlock code={item.input} language="bash" />
               ) : (
-                <ParsedCommandView
-                  parsed={parsed}
-                  workspaceRoot={workspaceRoot}
-                  hideCwd
-                  onSectionClick={scrollToSection}
-                />
+                <StepTimingCtx value={timings}>
+                  <ParsedCommandView
+                    parsed={parsed}
+                    workspaceRoot={workspaceRoot}
+                    hideCwd
+                    onSectionClick={scrollToSection}
+                  />
+                </StepTimingCtx>
               )}
             </div>
           </section>
@@ -483,6 +566,7 @@ function ParsedCommandView(props: {
 function StepList(props: {
   readonly steps: ReadonlyArray<ShellStep>;
   readonly onSectionClick: (marker: string) => void;
+  readonly pathPrefix?: string;
 }) {
   return (
     <ol className="flex flex-col gap-1.5">
@@ -490,7 +574,11 @@ function StepList(props: {
         // Steps are derived from an immutable command string.
         // oxlint-disable-next-line react/no-array-index-key
         <li key={index}>
-          <StepView step={step} onSectionClick={props.onSectionClick} />
+          <StepView
+            step={step}
+            path={`${props.pathPrefix ?? ""}${index}`}
+            onSectionClick={props.onSectionClick}
+          />
         </li>
       ))}
     </ol>
@@ -508,6 +596,7 @@ function ConnectorLabel({ connector }: { readonly connector: ShellConnector }) {
 
 function StepView(props: {
   readonly step: ShellStep;
+  readonly path: string;
   readonly onSectionClick: (marker: string) => void;
 }) {
   const { step } = props;
@@ -547,28 +636,70 @@ function StepView(props: {
             ) : null}
           </div>
           <div className="ms-1.5 border-s border-border/70 ps-3">
-            <StepList steps={step.body} onSectionClick={props.onSectionClick} />
+            <StepList
+              steps={step.body}
+              pathPrefix={`${props.path}.`}
+              onSectionClick={props.onSectionClick}
+            />
           </div>
           {step.elseBody ? (
             <>
               <span className="text-xs font-medium text-muted-foreground">Otherwise</span>
               <div className="ms-1.5 border-s border-border/70 ps-3">
-                <StepList steps={step.elseBody} onSectionClick={props.onSectionClick} />
+                <StepList
+                  steps={step.elseBody}
+                  pathPrefix={`${props.path}.e`}
+                  onSectionClick={props.onSectionClick}
+                />
               </div>
             </>
           ) : null}
         </div>
       );
     case "run":
-      return <RunStepView step={step} onSectionClick={props.onSectionClick} />;
+      return <RunStepView step={step} path={props.path} onSectionClick={props.onSectionClick} />;
   }
+}
+
+function StepTimingBadge({ timing }: { readonly timing: StepTiming }) {
+  const { runningSinceMs, runs } = timing;
+  // Activity is sampled every few seconds, so only a single long run gets a ticking timer;
+  // repeated short runs (loop bodies) would keep ticking after each one exits.
+  const label =
+    runs > 1
+      ? runningSinceMs === null
+        ? `${runs} runs${timing.finishedMs >= 3_000 ? ` · ≈${formatElapsedMs(timing.finishedMs)}` : ""}`
+        : `running · run ${runs}`
+      : null;
+  return (
+    <Badge
+      variant={runningSinceMs === null ? "outline" : "info"}
+      size="sm"
+      className="order-last ms-auto shrink-0"
+    >
+      {label ??
+        (runningSinceMs === null ? (
+          `≈${formatElapsedMs(timing.finishedMs)}`
+        ) : (
+          <span
+            ref={tickTextContent(
+              (nowMs) => `running ${formatElapsedMs(Math.max(0, nowMs - runningSinceMs))}`,
+              true,
+            )}
+            className="tabular-nums"
+          />
+        ))}
+    </Badge>
+  );
 }
 
 function RunStepView(props: {
   readonly step: Extract<ShellStep, { kind: "run" }>;
+  readonly path: string;
   readonly onSectionClick: (marker: string) => void;
 }) {
   const { step } = props;
+  const timing = use(StepTimingCtx).get(props.path);
   const mainCommand = step.words.map((word) => word.raw).join(" ");
   const badges = [
     ...(step.background ? ["in background"] : []),
@@ -580,6 +711,7 @@ function RunStepView(props: {
     <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
       <div className="flex min-w-0 items-baseline">
         <ConnectorLabel connector={step.connector} />
+        {timing ? <StepTimingBadge timing={timing} /> : null}
         {step.summary ? (
           <span className="min-w-0 text-sm text-foreground">{step.summary}</span>
         ) : step.nested ? (
