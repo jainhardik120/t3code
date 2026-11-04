@@ -297,7 +297,7 @@ export function CommandDetailsDialog({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogPopup
-        className="flex h-[min(88vh,60rem)] w-[min(96vw,80rem)] max-w-none flex-col overflow-hidden"
+        className="flex h-[min(88vh,60rem)] max-w-7xl flex-col overflow-hidden"
         bottomStickOnMobile={false}
       >
         <div className="flex flex-col gap-1.5 border-b border-border/70 px-5 py-3.5 pe-12">
@@ -345,7 +345,7 @@ export function CommandDetailsDialog({
             ) : null}
           </DialogDescription>
         </div>
-        <div className="grid min-h-0 flex-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1">
           <section className="flex min-h-0 flex-col border-border/70 max-md:border-b md:border-e">
             <PaneHeader
               label="Command"
